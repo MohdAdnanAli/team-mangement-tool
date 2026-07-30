@@ -33,17 +33,20 @@ const uid = (p) => p + '-' + Math.random().toString(36).slice(2,7);
 
 const state = {
   view: 'dashboard',
-  taskSeq: 9,
+  taskSeq: 13,
   members: [
-    {id:'mem-1', name:'Asha Rao', role:'Frontend Engineer', capacity:40},
-    {id:'mem-2', name:'Devan Iyer', role:'Backend Engineer', capacity:40},
-    {id:'mem-3', name:'Priya Nair', role:'Product Designer', capacity:32},
-    {id:'mem-4', name:'Karan Mehta', role:'QA Lead', capacity:36},
+    {id:'mem-1', name:'Abhijeet', role:'Low-Level Design', capacity:38},
+    {id:'mem-2', name:'Pandey Ji', role:'Model and protype', capacity:35},
+    {id:'mem-3', name:'Ashutosh Ji', role:'High-Level Design', capacity:32},
+    {id:'mem-4', name:'Jaiswal', role:'Veriification team', capacity:30},
   ],
   projects: [
-    {id:'proj-1', name:'Aurora Launch', color:'#4FD1C5'},
-    {id:'proj-2', name:'Client Onboarding', color:'#F2B84B'},
-    {id:'proj-3', name:'Internal Tooling', color:'#8AA4FF'},
+    {id:'proj-1', name:'Dashboard', color:'#4FD1C5'},
+    {id:'proj-2', name:'Profile', color:'#F2B84B'},
+    {id:'proj-3', name:'Sub IsOrNot', color:'#8AA4FF'},
+    {id:'proj-4', name:'Bill life Cycle', color:'#E8656A'},
+    {id:'proj-5', name:'otp and mail services', color:'#5FBF7A'},
+    {id:'proj-6', name:'Entity Relation and clean design', color:'#C792EA'},
   ],
   tasks: [
     {id:'TSK-001', title:'Ship new pricing page hero', projectId:'proj-1', assigneeId:'mem-1', status:'progress', priority:'high', due:'2026-08-02', hours:8},
@@ -54,6 +57,45 @@ const state = {
     {id:'TSK-006', title:'Customer migration runbook', projectId:'proj-2', assigneeId:'mem-2', status:'todo', priority:'med', due:'2026-08-10', hours:5},
     {id:'TSK-007', title:'Internal CLI: add dry-run flag', projectId:'proj-3', assigneeId:'mem-2', status:'done', priority:'low', due:'2026-07-20', hours:4},
     {id:'TSK-008', title:'Design system: audit spacing tokens', projectId:'proj-3', assigneeId:'mem-3', status:'todo', priority:'low', due:'2026-08-14', hours:7},
+    {id:'TSK-010', title:'Entity 101', projectId:'proj-6', assigneeId:'mem-1', status:'todo', priority:'low', due:'2026-10-05', hours:6},
+    {id:'TSK-011', title:'services 101', projectId:'proj-4', assigneeId:'mem-2', status:'progress', priority:'med', due:'2026-10-05', hours:8},
+    {id:'TSK-012', title:'system 101', projectId:'proj-2', assigneeId:'mem-3', status:'review', priority:'low', due:'2026-10-05', hours:5},
+    {id:'TSK-013', title:'Verification to the end', projectId:'proj-3', assigneeId:'mem-4', status:'done', priority:'med', due:'2026-10-05', hours:7},
+  ],
+  billSeq: 0,
+  bills: [
+    {
+      id:'bill-1',
+      memberId:'mem-1',
+      billNumber:'INV-001',
+      periodStart:'2026-07-01',
+      periodEnd:'2026-07-31',
+      lineItems:[
+        { description:'Dashboard UI development', hours:24, rate:2500 },
+        { description:'Sprint planning & code review', hours:8, rate:2500 },
+      ],
+      taxRate:18,
+      issueDate:'2026-08-01',
+      dueDate:'2026-08-15',
+      status:'sent',
+      notes:'Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.',
+    },
+    {
+      id:'bill-2',
+      memberId:'mem-3',
+      billNumber:'INV-002',
+      periodStart:'2026-07-01',
+      periodEnd:'2026-07-31',
+      lineItems:[
+        { description:'High-level architecture review', hours:10, rate:3000 },
+        { description:'Technical documentation', hours:6, rate:2500 },
+      ],
+      taxRate:18,
+      issueDate:'2026-08-02',
+      dueDate:'2026-08-16',
+      status:'draft',
+      notes:'Draft — pending approval from the client.',
+    },
   ],
   agreements: [
     {
@@ -92,6 +134,22 @@ function project(id){ return state.projects.find(p=>p.id===id); }
 function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 function isOverdue(task){ return task.status!=='done' && new Date(task.due) < new Date('2026-07-29'); }
 function fmtDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-US',{month:'short', day:'numeric'}); }
+
+/* ============================= BILL HELPERS ============================= */
+function formatCurrency(n){ return '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:0, maximumFractionDigits:0}); }
+function calcSubtotal(items){ return items.reduce((s,i)=> s + (i.hours * i.rate), 0); }
+function calcTax(subtotal, rate){ return Math.round(subtotal * (rate/100)); }
+function calcBillTotal(bill){
+  const sub = calcSubtotal(bill.lineItems);
+  return sub + calcTax(sub, bill.taxRate);
+}
+function nextBillNumber(){
+  state.billSeq++;
+  return 'INV-' + String(state.billSeq).padStart(3,'0');
+}
+function billMember(bill){ return member(bill.memberId); }
+function billStatusClass(s){ return s==='paid'?'success':s==='overdue'?'danger':s==='sent'?'amber':s==='draft'?'':'teal'; }
+
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent = msg;
@@ -108,6 +166,7 @@ const NAV = [
   {key:'workload', icon:'▮', label:'Workload'},
   {key:'projects', icon:'◫', label:'Projects'},
   {key:'team', icon:'◍', label:'Team'},
+  {key:'bills', icon:'💰', label:'Bills'},
   {key:'agreements', icon:'✎', label:'Agreements'},
 ];
 
@@ -118,6 +177,7 @@ function renderNav(){
     if(n.key==='kanban') count = state.tasks.length;
     if(n.key==='team') count = state.members.length;
     if(n.key==='projects') count = state.projects.length;
+    if(n.key==='bills') count = state.bills.length;
     if(n.key==='agreements') count = state.agreements.length;
     return `<button class="nav-item ${state.view===n.key?'active':''}" data-nav="${n.key}">
       <span class="nav-icon">${n.icon}</span>${n.label}
@@ -135,12 +195,15 @@ function renderTicker(){
   const inProgress = state.tasks.filter(t=>t.status==='progress').length;
   const overdue = state.tasks.filter(isOverdue).length;
   const doneCount = state.tasks.filter(t=>t.status==='done').length;
+  const totalBilled = state.bills.reduce((s,b)=> s + calcBillTotal(b), 0);
+  const paidBilled = state.bills.filter(b=>b.status==='paid').reduce((s,b)=> s + calcBillTotal(b), 0);
   const cells = [
     {label:'Active tasks', value: total - doneCount, cls:''},
     {label:'In progress', value: inProgress, cls:'amber'},
-    {label:'Overdue', value: overdue, cls:'danger'},
+    {label:'Overdue tasks', value: overdue, cls:'danger'},
     {label:'Completed', value: doneCount, cls:'success'},
-    {label:'Team size', value: state.members.length, cls:'teal'},
+    {label:'Billed', value: '₹' + Math.round(totalBilled/1000) + 'k', cls:'amber'},
+    {label:'Paid', value: '₹' + Math.round(paidBilled/1000) + 'k', cls:'teal'},
   ];
   document.getElementById('ticker').innerHTML = cells.map(c=>`
     <div class="ticker-cell">
@@ -353,6 +416,10 @@ function renderProjects(){
               <button class="icon-btn" data-del-proj="${p.id}" title="Delete">✕</button>
             </div>
           </div>
+          <div class="proj-color-row">
+            <span class="swatch-dot-sm" style="background:${p.color}"></span>
+            <span class="proj-color-hex">${p.color}</span>
+          </div>
           <div class="proj-card-stat">${done}/${tasks.length} tickets done</div>
           <div class="bar-track"><div class="bar-fill" style="width:${tasks.length?Math.round(done/tasks.length*100):0}%; background:${p.color};"></div></div>
         </div>`;
@@ -420,6 +487,291 @@ function renderTeam(){
       renderNav(); renderTicker(); renderTeam();
       toast('Teammate removed');
     });
+  });
+}
+
+/* ============================= BILLS ============================= */
+function renderBills(){
+  const view = document.getElementById('view');
+  const memberOptions = state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+
+  const totalBilled = state.bills.reduce((s,b)=> s + calcBillTotal(b), 0);
+  const outstanding = state.bills.filter(b=>b.status==='sent' || b.status==='overdue').reduce((s,b)=> s + calcBillTotal(b), 0);
+  const paidAmount = state.bills.filter(b=>b.status==='paid').reduce((s,b)=> s + calcBillTotal(b), 0);
+  const overdueAmt = state.bills.filter(b=>b.status==='overdue').reduce((s,b)=> s + calcBillTotal(b), 0);
+
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <div class="view-title">Bills &amp; Invoices</div>
+        <div class="view-sub">${state.bills.length} INVOICES · ${formatCurrency(totalBilled)} TOTAL</div>
+      </div>
+      <div class="view-actions">
+        <select class="filter" id="billFilterStatus">
+          <option value="">All status</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <select class="filter" id="billFilterMember"><option value="">All members</option>${memberOptions}</select>
+        <button class="btn btn-primary" id="addBillBtn">+ New invoice</button>
+      </div>
+    </div>
+    <div class="bill-summary">
+      <div class="bill-stat"><div class="bill-stat-label">Total Billed</div><div class="bill-stat-value amber">${formatCurrency(totalBilled)}</div></div>
+      <div class="bill-stat"><div class="bill-stat-label">Outstanding</div><div class="bill-stat-value danger">${formatCurrency(outstanding)}</div></div>
+      <div class="bill-stat"><div class="bill-stat-label">Paid</div><div class="bill-stat-value success">${formatCurrency(paidAmount)}</div></div>
+      <div class="bill-stat"><div class="bill-stat-label">Overdue</div><div class="bill-stat-value danger">${formatCurrency(overdueAmt)}</div></div>
+    </div>
+    <div class="bill-list" id="billList"></div>
+    <div id="billEmpty" class="bill-empty" style="${state.bills.length?'display:none':'display:block'}">No invoices yet — create one to start tracking billable work.</div>
+  `;
+
+  document.getElementById('addBillBtn').addEventListener('click', openBillModal);
+  document.getElementById('billFilterStatus').addEventListener('change', drawBills);
+  document.getElementById('billFilterMember').addEventListener('change', drawBills);
+  drawBills();
+
+  function drawBills(){
+    const fs = document.getElementById('billFilterStatus').value;
+    const fm = document.getElementById('billFilterMember').value;
+    const filtered = state.bills.filter(b => (!fs || b.status===fs) && (!fm || b.memberId===fm));
+    const list = document.getElementById('billList');
+    const empty = document.getElementById('billEmpty');
+    if(list){
+      list.innerHTML = filtered.map(b => billCardHTML(b)).join('');
+      empty.style.display = filtered.length ? 'none' : 'block';
+    }
+    document.querySelectorAll('[data-bill-toggle]').forEach(el=>{
+      el.addEventListener('click', function(){
+        const card = this.closest('.invoice-card');
+        card.classList.toggle('expanded');
+      });
+    });
+    document.querySelectorAll('[data-bill-edit]').forEach(btn=>{
+      btn.addEventListener('click', e=>{ e.stopPropagation(); openBillModal(state.bills.find(b=>b.id===btn.dataset.billEdit)); });
+    });
+    document.querySelectorAll('[data-bill-del]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const b = state.bills.find(x=>x.id===btn.dataset.billDel);
+        if(!b || !window.confirm(`Delete ${b.billNumber}?`)) return;
+        state.bills = state.bills.filter(x=>x.id!==b.id);
+        renderNav(); renderTicker(); renderBills();
+        toast('Invoice deleted');
+      });
+    });
+    document.querySelectorAll('[data-bill-status]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const b = state.bills.find(x=>x.id===btn.dataset.billStatus);
+        if(!b) return;
+        const next = {draft:'sent', sent:'paid', paid:'paid', overdue:'paid'}[b.status] || 'paid';
+        b.status = next;
+        renderNav(); renderTicker(); drawBills();
+        toast(`Invoice marked as ${next}`);
+      });
+    });
+  }
+}
+
+function billCardHTML(b){
+  const m = billMember(b);
+  const sub = calcSubtotal(b.lineItems);
+  const tax = calcTax(sub, b.taxRate);
+  const total = sub + tax;
+  const overdue = b.status==='sent' && new Date(b.dueDate) < new Date('2026-08-01');
+  const effectiveStatus = overdue ? 'overdue' : b.status;
+  if(overdue && b.status!=='overdue'){ b.status='overdue'; }
+  const statusCls = billStatusClass(effectiveStatus);
+
+  return `
+    <div class="invoice-card ${b._expanded?'expanded':''}">
+      <div class="invoice-head" data-bill-toggle>
+        <div class="invoice-head-left">
+          <span class="invoice-num">${b.billNumber}</span>
+          <span class="invoice-member">${m ? escapeHTML(m.name) : 'Unassigned'}</span>
+          <span class="status-pill ${statusCls}">${effectiveStatus}</span>
+        </div>
+        <div class="invoice-head-right">
+          <span class="invoice-total">${formatCurrency(total)}</span>
+          <span style="color:var(--text-faint);font-size:12px;">▼</span>
+        </div>
+      </div>
+      <div class="invoice-body">
+        <div class="invoice-period">Period: ${fmtDate(b.periodStart)} — ${fmtDate(b.periodEnd)}</div>
+
+        <table class="invoice-table">
+          <thead><tr><th>Description</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead>
+          <tbody>
+            ${b.lineItems.map(li => `
+              <tr>
+                <td>${escapeHTML(li.description)}</td>
+                <td>${li.hours}</td>
+                <td>${formatCurrency(li.rate)}/hr</td>
+                <td class="amt">${formatCurrency(li.hours * li.rate)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div class="invoice-totals">
+          <div><span>Subtotal</span><span>${formatCurrency(sub)}</span></div>
+          <div><span>Tax (${b.taxRate}%)</span><span>${formatCurrency(tax)}</span></div>
+          <div class="grand-total"><span>Total</span><span>${formatCurrency(total)}</span></div>
+        </div>
+
+        ${b.notes ? `<div class="invoice-notes">${escapeHTML(b.notes)}</div>` : ''}
+
+        <div class="invoice-dates">
+          <span>Issued: ${fmtDate(b.issueDate)}</span>
+          <span>Due: ${fmtDate(b.dueDate)}</span>
+        </div>
+
+        <div class="invoice-actions">
+          <button class="btn btn-sm" data-bill-edit="${b.id}">✎ Edit</button>
+          <button class="btn btn-sm btn-primary" data-bill-status="${b.id}">${effectiveStatus==='draft'?'Mark sent':effectiveStatus==='sent'?'Mark paid':effectiveStatus==='overdue'?'Mark paid':'Paid ✓'}</button>
+          <button class="btn btn-sm btn-ghost" data-bill-del="${b.id}">✕ Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openBillModal(existing){
+  const memberOptions = state.members.map(m=>`<option value="${m.id}" ${existing && existing.memberId===m.id?'selected':''}>${m.name}</option>`).join('');
+  const statusOptions = ['draft','sent','paid','overdue'].map(s=>`<option value="${s}" ${existing && existing.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+
+  const lineItemsHTML = existing ? existing.lineItems.map((li,i)=>`
+    <div class="line-item-row" data-li="${i}">
+      <input class="li-desc" value="${escapeHTML(li.description)}" placeholder="Description">
+      <input class="li-hrs" type="number" min="0" step="0.5" value="${li.hours}">
+      <input class="li-rate" type="number" min="0" step="100" value="${li.rate}">
+      <span class="amt" style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);text-align:right;">${formatCurrency(li.hours*li.rate)}</span>
+      <button class="line-item-del" data-remove-li="${i}">×</button>
+    </div>`) : `<div class="line-item-row" data-li="0">
+      <input class="li-desc" placeholder="e.g. Development work">
+      <input class="li-hrs" type="number" min="0" step="0.5" value="8">
+      <input class="li-rate" type="number" min="0" step="100" value="2500">
+      <span class="amt" style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);text-align:right;">₹20,000</span>
+      <button class="line-item-del" data-remove-li="0">×</button>
+    </div>`;
+
+  openModal(`
+    <div class="modal-title">${existing ? 'Edit invoice' : 'New invoice'}</div>
+    <div class="field"><label>Bill to (team member)</label><select id="fBillMember">${memberOptions}</select></div>
+    <div class="row2">
+      <div class="field"><label>Period start</label><input id="fPeriodStart" type="date" value="${existing ? existing.periodStart : '2026-08-01'}"></div>
+      <div class="field"><label>Period end</label><input id="fPeriodEnd" type="date" value="${existing ? existing.periodEnd : '2026-08-31'}"></div>
+    </div>
+    <div class="field">
+      <label>Line items</label>
+      <div id="lineItemsContainer">${lineItemsHTML}</div>
+      <button class="btn btn-sm" id="addLineItemBtn" style="margin-top:6px;">+ Add line</button>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Tax rate (%)</label><input id="fTaxRate" type="number" min="0" step="1" value="${existing ? existing.taxRate : 18}"></div>
+      <div class="field"><label>Status</label><select id="fBillStatus">${statusOptions}</select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Issue date</label><input id="fIssueDate" type="date" value="${existing ? existing.issueDate : '2026-08-01'}"></div>
+      <div class="field"><label>Due date</label><input id="fDueDate" type="date" value="${existing ? existing.dueDate : '2026-08-15'}"></div>
+    </div>
+    <div class="field"><label>Notes / Payment terms</label><textarea id="fBillNotes" rows="3" placeholder="e.g. Payment via NEFT within 15 days...">${existing ? escapeHTML(existing.notes||'') : ''}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveBillBtn">${existing ? 'Save changes' : 'Create invoice'}</button>
+    </div>
+  `);
+
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('addLineItemBtn').addEventListener('click', ()=>{
+    const container = document.getElementById('lineItemsContainer');
+    const idx = container.children.length;
+    const row = document.createElement('div');
+    row.className = 'line-item-row';
+    row.dataset.li = idx;
+    row.innerHTML = `
+      <input class="li-desc" placeholder="Description">
+      <input class="li-hrs" type="number" min="0" step="0.5" value="4">
+      <input class="li-rate" type="number" min="0" step="100" value="2500">
+      <span class="amt" style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);text-align:right;">₹10,000</span>
+      <button class="line-item-del" data-remove-li="${idx}">×</button>`;
+    container.appendChild(row);
+    row.querySelector('.line-item-del').addEventListener('click', function(){ row.remove(); });
+    row.querySelectorAll('.li-hrs, .li-rate').forEach(inp=>{
+      inp.addEventListener('input', function(){
+        const hrs = parseFloat(row.querySelector('.li-hrs').value) || 0;
+        const rate = parseFloat(row.querySelector('.li-rate').value) || 0;
+        row.querySelector('.amt').textContent = formatCurrency(hrs*rate);
+      });
+    });
+  });
+
+  document.querySelectorAll('.line-item-del').forEach(btn=>{
+    btn.addEventListener('click', function(){
+      const row = this.closest('.line-item-row');
+      if(document.querySelectorAll('.line-item-row').length > 1) row.remove();
+      else toast('Need at least one line item');
+    });
+  });
+
+  document.querySelectorAll('.li-hrs, .li-rate').forEach(inp=>{
+    inp.addEventListener('input', function(){
+      const row = this.closest('.line-item-row');
+      const hrs = parseFloat(row.querySelector('.li-hrs').value) || 0;
+      const rate = parseFloat(row.querySelector('.li-rate').value) || 0;
+      row.querySelector('.amt').textContent = formatCurrency(hrs*rate);
+    });
+  });
+
+  document.getElementById('saveBillBtn').addEventListener('click', ()=>{
+    const memberId = document.getElementById('fBillMember').value;
+    const periodStart = document.getElementById('fPeriodStart').value;
+    const periodEnd = document.getElementById('fPeriodEnd').value;
+    const taxRate = parseInt(document.getElementById('fTaxRate').value) || 0;
+    const status = document.getElementById('fBillStatus').value;
+    const issueDate = document.getElementById('fIssueDate').value;
+    const dueDate = document.getElementById('fDueDate').value;
+    const notes = document.getElementById('fBillNotes').value.trim();
+
+    const items = [];
+    document.querySelectorAll('.line-item-row').forEach(row=>{
+      const desc = row.querySelector('.li-desc').value.trim();
+      const hrs = parseFloat(row.querySelector('.li-hrs').value) || 0;
+      const rate = parseFloat(row.querySelector('.li-rate').value) || 0;
+      if(desc && hrs>0 && rate>0) items.push({ description:desc, hours:hrs, rate });
+    });
+
+    if(items.length===0){ toast('Add at least one line item'); return; }
+
+    if(existing){
+      existing.memberId = memberId;
+      existing.periodStart = periodStart;
+      existing.periodEnd = periodEnd;
+      existing.lineItems = items;
+      existing.taxRate = taxRate;
+      existing.status = status;
+      existing.issueDate = issueDate;
+      existing.dueDate = dueDate;
+      existing.notes = notes;
+      toast('Invoice updated');
+    } else {
+      state.bills.push({
+        id: uid('bill'),
+        memberId,
+        billNumber: nextBillNumber(),
+        periodStart,
+        periodEnd,
+        lineItems: items,
+        taxRate,
+        status,
+        issueDate,
+        dueDate,
+        notes,
+      });
+      toast('Invoice created');
+    }
+    closeModal(); renderNav(); renderTicker(); renderBills();
   });
 }
 
@@ -585,7 +937,13 @@ function openProjectModal(existing){
     <div class="modal-title">${existing ? 'Edit project' : 'New project'}</div>
     <div class="field"><label>Name</label><input id="pName" placeholder="e.g. Mobile Revamp" value="${existing ? escapeHTML(existing.name) : ''}"></div>
     <div class="field"><label>Accent color</label>
-      <select id="pColor">${palette.map(c=>`<option value="${c}" ${existing && existing.color===c ? 'selected':''}>${c}</option>`).join('')}</select>
+      <div class="color-swatches">${palette.map(c=>`
+        <label class="color-swatch-opt ${existing && existing.color===c ? 'selected':''}">
+          <input type="radio" name="pColor" value="${c}" ${existing && existing.color===c ? 'checked':''}>
+          <span class="swatch-dot" style="background:${c}"></span>
+          <span class="swatch-hex">${c}</span>
+        </label>
+      `).join('')}</div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
@@ -593,10 +951,16 @@ function openProjectModal(existing){
     </div>
   `);
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.querySelectorAll('.color-swatch-opt').forEach(el=>{
+    el.addEventListener('click', function(){
+      document.querySelectorAll('.color-swatch-opt').forEach(o=>o.classList.remove('selected'));
+      this.classList.add('selected');
+    });
+  });
   document.getElementById('saveProjBtn').addEventListener('click', ()=>{
     const name = document.getElementById('pName').value.trim();
     if(!name){ toast('Name is required'); return; }
-    const color = document.getElementById('pColor').value;
+    const color = document.querySelector('input[name="pColor"]:checked')?.value || '#4FD1C5';
     if(existing){
       existing.name = name; existing.color = color;
       toast('Project updated');
@@ -618,6 +982,7 @@ function render(){
     else if(state.view==='workload') renderWorkload();
     else if(state.view==='projects') renderProjects();
     else if(state.view==='team') renderTeam();
+    else if(state.view==='bills') renderBills();
     else if(state.view==='agreements') renderAgreements();
   }catch(err){
     console.error('Render error:', err);
