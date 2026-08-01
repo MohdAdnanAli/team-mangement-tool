@@ -531,7 +531,7 @@ function renderBills(){
     <div id="billEmpty" class="bill-empty" style="${state.bills.length?'display:none':'display:block'}">No invoices yet — create one to start tracking billable work.</div>
   `;
 
-  document.getElementById('addBillBtn').addEventListener('click', openBillModal);
+  document.getElementById('addBillBtn').addEventListener('click', ()=>openBillModal());
   document.getElementById('billFilterStatus').addEventListener('change', drawBills);
   document.getElementById('billFilterMember').addEventListener('change', drawBills);
   drawBills();
