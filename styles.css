@@ -410,6 +410,21 @@
 .line-item-del{background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; padding:2px;}
 .line-item-del:hover{color:var(--danger);}
 
+/* ===== Export modal ===== */
+.export-section-list{display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto;}
+.export-option{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:9px 11px; border:1px solid var(--border); border-radius:5px;
+  cursor:pointer; background:var(--surface-raised);
+  transition:border-color .12s, background .12s;
+}
+.export-option:hover{border-color:var(--text-dim);}
+.export-option:has(input:checked){border-color:var(--amber); background:var(--amber-dim);}
+.export-option input{width:auto; margin-top:2px; accent-color:var(--amber);}
+.export-opt-label{display:flex; flex-direction:column; gap:2px;}
+.export-opt-title{font-size:13px; font-weight:600; color:var(--text);}
+.export-opt-desc{font-family:var(--font-mono); font-size:10px; color:var(--text-faint);}
+
 .toast{
     position:fixed; bottom:20px; right:20px; background:var(--surface-raised); border:1px solid var(--teal);
     color:var(--text); padding:10px 16px; border-radius:6px; font-size:12.5px; z-index:60;

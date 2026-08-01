@@ -1022,54 +1022,394 @@ window.addEventListener('error', (e)=>{
 });
 
 /* ============================= PDF EXPORT ============================= */
-async function exportPDF(){
-  try{
-    const { PDFDocument, StandardFonts, rgb } = PDFLib;
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const form = pdfDoc.getForm();
+const EXPORT_SECTIONS = [
+  { key:'dashboard', title:'Dashboard', desc:'Snapshot stats, tasks by status, workload & project progress' },
+  { key:'kanban', title:'Kanban', desc:'All tickets grouped by status column, with checkboxes' },
+  { key:'workload', title:'Workload', desc:'Active hours vs weekly capacity per teammate' },
+  { key:'projects', title:'Projects', desc:'Project list with completion progress' },
+  { key:'team', title:'Team', desc:'Members, roles and weekly capacity' },
+  { key:'bills', title:'Bills', desc:'Invoices with line items and totals' },
+  { key:'agreements', title:'Agreements', desc:'Verbal deals & billing terms' },
+];
 
-    const pageW = 612, pageH = 792;
-    let page = pdfDoc.addPage([pageW, pageH]);
-    let y = pageH - 60;
+/* -- PDF geometry / colors -- */
+const PAGE_W = 612, PAGE_H = 792, MARGIN = 50;
+const CONTENT_W = PAGE_W - MARGIN * 2;
 
-    page.drawText('Ops Console — Ticket Sheet', { x: 50, y, size: 18, font: fontBold, color: rgb(0.1,0.1,0.12) });
-    y -= 18;
-    page.drawText('Check completed tickets, save, and re-import into the console to sync.', { x:50, y, size:9, font, color: rgb(0.4,0.4,0.4) });
-    y -= 26;
-
-    STATUS_COLS.forEach(()=>{});
-
-    state.tasks.forEach(t=>{
-      if(y < 80){ page = pdfDoc.addPage([pageW, pageH]); y = pageH - 60; }
-      const cb = form.createCheckBox('chk_' + t.id);
-      cb.addToPage(page, { x:50, y: y-10, width:12, height:12, borderColor: rgb(0.6,0.6,0.6), borderWidth:1 });
-      if(t.status==='done') cb.check();
-
-      const m = member(t.assigneeId); const p = project(t.projectId);
-      page.drawText(`${t.id}`, { x:70, y, size:9, font, color: rgb(0.5,0.5,0.5) });
-      page.drawText(`${t.title}`, { x:118, y, size:10.5, font: fontBold, color: rgb(0.08,0.08,0.1) });
-      y -= 13;
-      page.drawText(`${p?p.name:'—'}  ·  ${m?m.name:'Unassigned'}  ·  due ${t.due}  ·  status: ${t.status}`, { x:118, y, size:8.5, font, color: rgb(0.45,0.45,0.45) });
-      y -= 22;
-    });
-
-    const bytes = await pdfDoc.save();
-    const blob = new Blob([bytes], { type:'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'ops-console-ticket-sheet.pdf';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    toast('Ticket sheet exported');
-  }catch(err){
-    console.error(err);
-    toast('Export failed — see console');
-  }
+/* Helvetica (WinAnsi) can't encode some glyphs we use in the UI — swap them out. */
+function sanitizePdfText(text){
+  return String(text == null ? '' : text)
+    .replace(/₹/g, 'Rs.')
+    .replace(/→/g, '-')
+    .replace(/·/g, '-')
+    .replace(/[^\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026]/g, '-');
 }
 
-document.getElementById('exportBtn').addEventListener('click', exportPDF);
+function wrapText(font, text, size, maxWidth){
+  text = sanitizePdfText(text);
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for(const word of words){
+    const test = line ? line + ' ' + word : word;
+    if(line && font.widthOfTextAtSize(test, size) > maxWidth){
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if(line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+function makePdfCtx(pdfDoc, font, fontBold, form, colors){
+  return {
+    pdfDoc, font, fontBold, form, colors,
+    page: null,
+    y: 0,
+    newPage(){
+      this.page = this.pdfDoc.addPage([PAGE_W, PAGE_H]);
+      this.y = PAGE_H - MARGIN;
+    },
+    ensureSpace(needed){
+      if(!this.page || this.y < MARGIN + needed) this.newPage();
+    },
+    header(title, sub){
+      this.newPage();
+      this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 18, font: this.fontBold, color: this.colors.dark });
+      this.y -= 16;
+      if(sub){
+        this.page.drawText(sanitizePdfText(sub), { x: MARGIN, y: this.y, size: 9, font: this.font, color: this.colors.faint });
+        this.y -= 12;
+      }
+      this.page.drawLine({ start:{ x: MARGIN, y: this.y }, end:{ x: PAGE_W - MARGIN, y: this.y }, thickness: 1, color: this.colors.line });
+      this.y -= 14;
+    },
+    sectionTitle(title){
+      this.ensureSpace(24);
+      this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 12.5, font: this.fontBold, color: this.colors.accent });
+      this.y -= 18;
+    },
+    paragraph(text, size = 9.5, color = null, lineHeight = 13){
+      const c = color || this.colors.body;
+      const lines = wrapText(this.font, text, size, CONTENT_W);
+      for(const line of lines){
+        this.ensureSpace(lineHeight);
+        this.page.drawText(line, { x: MARGIN, y: this.y, size, font: this.font, color: c });
+        this.y -= lineHeight;
+      }
+    },
+  };
+}
+
+function drawTable(ctx, headers, rows, widths, opts = {}){
+  const fontSize = opts.fontSize || 9;
+  const headerSize = opts.headerSize || 8.5;
+  const rowPad = 5;
+  const tableLeft = MARGIN;
+  const tableRight = PAGE_W - MARGIN;
+  const totalWidth = tableRight - tableLeft;
+  const sum = widths.reduce((a, b) => a + b, 0);
+  const cols = widths.map(w => (w / sum) * totalWidth);
+  const { colors } = ctx;
+
+  const wrapCell = (text, f, s, w) => wrapText(f, text, s, Math.max(w - 4, 24));
+
+  const headerLines = headers.map((h, i) => wrapCell(h, ctx.fontBold, headerSize, cols[i]));
+  const headerHeight = Math.max(1, ...headerLines.map(l => l.length)) * (headerSize + 3) + rowPad * 2;
+
+  const rowsData = rows.map(r => {
+    const cells = r.map((val, i) => wrapCell(val, ctx.font, fontSize, cols[i]));
+    const height = Math.max(1, ...cells.map(c => c.length)) * (fontSize + 3) + rowPad * 2;
+    return { cells, height };
+  });
+
+  const drawHeader = () => {
+    const yTop = ctx.y;
+    ctx.page.drawRectangle({
+      x: tableLeft, y: yTop - headerHeight,
+      width: totalWidth, height: headerHeight,
+      color: colors.headerBg,
+    });
+    let cx = tableLeft;
+    headerLines.forEach((lines, i) => {
+      let ty = yTop - rowPad - headerSize;
+      lines.forEach(line => {
+        ctx.page.drawText(line, { x: cx + 4, y: ty, size: headerSize, font: ctx.fontBold, color: colors.dark });
+        ty -= headerSize + 3;
+      });
+      cx += cols[i];
+    });
+    ctx.y -= headerHeight;
+  };
+
+  ctx.ensureSpace(headerHeight + 14);
+  drawHeader();
+
+  rowsData.forEach((rd, ri) => {
+    const prev = ctx.page;
+    ctx.ensureSpace(rd.height);
+    if(ctx.page !== prev) drawHeader();
+    const yTop = ctx.y;
+    if(ri % 2 === 1){
+      ctx.page.drawRectangle({
+        x: tableLeft, y: yTop - rd.height,
+        width: totalWidth, height: rd.height,
+        color: colors.zebra,
+      });
+    }
+    ctx.page.drawLine({ start:{ x: tableLeft, y: yTop }, end:{ x: tableRight, y: yTop }, thickness: 0.5, color: colors.line });
+    let cx = tableLeft;
+    rd.cells.forEach((lines, i) => {
+      let ty = yTop - rowPad - fontSize;
+      lines.forEach(line => {
+        ctx.page.drawText(line, { x: cx + 4, y: ty, size: fontSize, font: ctx.font, color: colors.body });
+        ty -= fontSize + 3;
+      });
+      cx += cols[i];
+    });
+    ctx.y -= rd.height;
+  });
+  ctx.page.drawLine({ start:{ x: tableLeft, y: ctx.y }, end:{ x: tableRight, y: ctx.y }, thickness: 0.5, color: colors.line });
+  ctx.y -= 12;
+}
+
+/* -- Section renderers -- */
+function pdfDashboard(ctx){
+  ctx.header('Dashboard', 'SNAPSHOT — ' + new Date('2026-07-29').toDateString().toUpperCase());
+
+  const total = state.tasks.length;
+  const doneCount = state.tasks.filter(t => t.status === 'done').length;
+  const inProgress = state.tasks.filter(t => t.status === 'progress').length;
+  const overdue = state.tasks.filter(isOverdue).length;
+  const totalBilled = state.bills.reduce((s, b) => s + calcBillTotal(b), 0);
+  const paidBilled = state.bills.filter(b => b.status === 'paid').reduce((s, b) => s + calcBillTotal(b), 0);
+  const outstanding = state.bills.filter(b => b.status === 'sent' || b.status === 'overdue').reduce((s, b) => s + calcBillTotal(b), 0);
+
+  ctx.sectionTitle('Ticker');
+  drawTable(ctx,
+    ['Metric', 'Value'],
+    [
+      ['Active tasks', String(total - doneCount)],
+      ['In progress', String(inProgress)],
+      ['Overdue tasks', String(overdue)],
+      ['Completed', String(doneCount)],
+      ['Billed', formatCurrency(totalBilled)],
+      ['Paid', formatCurrency(paidBilled)],
+      ['Outstanding', formatCurrency(outstanding)],
+    ],
+    [3, 1]);
+
+  ctx.sectionTitle('Tasks by status');
+  drawTable(ctx,
+    ['Status', 'Count'],
+    STATUS_COLS.map(s => [s.label, String(state.tasks.filter(t => t.status === s.key).length)]),
+    [3, 1]);
+
+  ctx.sectionTitle('Workload by teammate');
+  drawTable(ctx,
+    ['Teammate', 'Role', 'Active hrs', 'Capacity'],
+    state.members.map(m => [
+      m.name, m.role,
+      String(state.tasks.filter(t => t.assigneeId === m.id && t.status !== 'done').reduce((a, t) => a + t.hours, 0)),
+      String(m.capacity) + 'h',
+    ]),
+    [2, 2.4, 1.1, 1]);
+
+  ctx.sectionTitle('Project progress');
+  drawTable(ctx,
+    ['Project', 'Done', 'Total', '% Complete'],
+    state.projects.map(p => {
+      const tasks = state.tasks.filter(t => t.projectId === p.id);
+      const done = tasks.filter(t => t.status === 'done').length;
+      return [p.name, String(done), String(tasks.length), tasks.length ? Math.round(done / tasks.length * 100) + '%' : '0%'];
+    }),
+    [3, 1, 1, 1.2]);
+}
+
+function pdfKanban(ctx){
+  ctx.header('Kanban', 'TICKETS GROUPED BY STATUS — ' + state.tasks.length + ' TOTAL');
+  STATUS_COLS.forEach(col => {
+    const tasks = state.tasks.filter(t => t.status === col.key);
+    if(!tasks.length) return;
+    ctx.sectionTitle(col.label + '  (' + tasks.length + ')');
+    tasks.forEach(t => {
+      ctx.ensureSpace(38);
+      const cb = ctx.form.createCheckBox('chk_' + t.id);
+      cb.addToPage(ctx.page, { x: MARGIN, y: ctx.y - 9, width: 11, height: 11, borderColor: ctx.colors.dim, borderWidth: 1 });
+      if(t.status === 'done') cb.check();
+      const m = member(t.assigneeId), p = project(t.projectId);
+      ctx.page.drawText(t.id, { x: MARGIN + 16, y: ctx.y, size: 8.5, font: ctx.font, color: ctx.colors.dim });
+      ctx.page.drawText(sanitizePdfText(t.title), { x: MARGIN + 66, y: ctx.y, size: 10, font: ctx.fontBold, color: ctx.colors.dark });
+      ctx.y -= 12;
+      ctx.page.drawText(
+        sanitizePdfText((p ? p.name : '—') + '  ·  ' + (m ? m.name : 'Unassigned') + '  ·  due ' + t.due + '  ·  ' + t.priority),
+        { x: MARGIN + 66, y: ctx.y, size: 8, font: ctx.font, color: ctx.colors.faint });
+      ctx.y -= 24;
+    });
+  });
+}
+
+function pdfWorkload(ctx){
+  ctx.header('Workload', 'ACTIVE HOURS VS WEEKLY CAPACITY');
+  drawTable(ctx,
+    ['Teammate', 'Role', 'Active hrs', 'Capacity', 'Utilization'],
+    state.members.map(m => {
+      const hrs = state.tasks.filter(t => t.assigneeId === m.id && t.status !== 'done').reduce((a, t) => a + t.hours, 0);
+      const pct = Math.round((hrs / m.capacity) * 100);
+      return [m.name, m.role, String(hrs) + 'h', String(m.capacity) + 'h', pct + '%'];
+    }),
+    [1.8, 2.2, 1, 1, 1]);
+}
+
+function pdfProjects(ctx){
+  ctx.header('Projects', state.projects.length + ' ACTIVE');
+  drawTable(ctx,
+    ['Project', 'Accent', 'Done', 'Total', '% Complete'],
+    state.projects.map(p => {
+      const tasks = state.tasks.filter(t => t.projectId === p.id);
+      const done = tasks.filter(t => t.status === 'done').length;
+      return [p.name, p.color, String(done), String(tasks.length), tasks.length ? Math.round(done / tasks.length * 100) + '%' : '0%'];
+    }),
+    [2.4, 1.2, 0.8, 0.8, 1.2]);
+}
+
+function pdfTeam(ctx){
+  ctx.header('Team', state.members.length + ' MEMBERS');
+  drawTable(ctx,
+    ['Name', 'Role', 'Weekly capacity'],
+    state.members.map(m => [m.name, m.role, String(m.capacity) + 'h']),
+    [1.6, 2.2, 1.2]);
+}
+
+function pdfBills(ctx){
+  ctx.header('Bills & Invoices', state.bills.length + ' INVOICES');
+  const totalBilled = state.bills.reduce((s, b) => s + calcBillTotal(b), 0);
+  ctx.paragraph('Total billed: ' + formatCurrency(totalBilled));
+  ctx.y -= 4;
+  if(!state.bills.length){
+    ctx.paragraph('No invoices yet.', 9.5, ctx.colors.faint);
+    return;
+  }
+  state.bills.forEach(b => {
+    const m = billMember(b);
+    const sub = calcSubtotal(b.lineItems);
+    const tax = calcTax(sub, b.taxRate);
+    const total = sub + tax;
+    ctx.sectionTitle(b.billNumber + ' — ' + (m ? m.name : 'Unassigned') + '  ·  ' + b.status);
+    ctx.paragraph('Period: ' + b.periodStart + ' → ' + b.periodEnd + '   |   Issued: ' + b.issueDate + '   |   Due: ' + b.dueDate, 8.5, ctx.colors.faint, 11);
+    drawTable(ctx,
+      ['Description', 'Hours', 'Rate', 'Amount'],
+      b.lineItems.map(li => [li.description, String(li.hours), formatCurrency(li.rate) + '/hr', formatCurrency(li.hours * li.rate)]),
+      [2.4, 0.7, 0.9, 1]);
+    ctx.paragraph('Subtotal: ' + formatCurrency(sub) + '   |   Tax (' + b.taxRate + '%): ' + formatCurrency(tax) + '   |   Total: ' + formatCurrency(total), 9, ctx.colors.dark);
+    if(b.notes) ctx.paragraph('Notes: ' + b.notes, 8.5, ctx.colors.faint, 11);
+    ctx.y -= 8;
+  });
+}
+
+function pdfAgreements(ctx){
+  ctx.header('Agreements', 'VERBAL DEALS & BILLING TERMS');
+  if(!state.agreements.length){
+    ctx.paragraph('No agreements logged yet.', 9.5, ctx.colors.faint);
+    return;
+  }
+  state.agreements.forEach(a => {
+    ctx.ensureSpace(60);
+    ctx.sectionTitle(a.title);
+    ctx.paragraph(
+      (a.party || '') + (a.amount ? '  ·  ' + a.amount : '') + '  ·  ' + a.status + '  ·  agreed ' + a.dateAgreed,
+      8.5, ctx.colors.faint, 11);
+    ctx.paragraph(a.terms || '', 9.5, ctx.colors.body);
+    ctx.y -= 6;
+  });
+}
+
+/* -- Export modal -- */
+function openExportModal(){
+  const options = EXPORT_SECTIONS.map(s => `
+    <label class="export-option">
+      <input type="checkbox" value="${s.key}" checked>
+      <span class="export-opt-label">
+        <span class="export-opt-title">${s.title}</span>
+        <span class="export-opt-desc">${s.desc}</span>
+      </span>
+    </label>`).join('');
+
+  openModal(`
+    <div class="modal-title">Export data (PDF)</div>
+    <div class="field"><label>Pick the sections to include</label>
+      <div class="export-section-list" id="exportSectionList">${options}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="exportNoneBtn">Select none</button>
+      <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="generatePdfBtn">Generate PDF</button>
+    </div>
+  `);
+
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('exportNoneBtn').addEventListener('click', ()=>{
+    document.querySelectorAll('#exportSectionList input').forEach(cb => cb.checked = false);
+  });
+  document.getElementById('generatePdfBtn').addEventListener('click', async ()=>{
+    const selected = [...document.querySelectorAll('#exportSectionList input:checked')].map(cb => cb.value);
+    if(!selected.length){ toast('Pick at least one section'); return; }
+    closeModal();
+    toast('Building PDF…');
+    try{
+      await buildExportPDF(selected);
+      toast('PDF exported');
+    }catch(err){
+      console.error(err);
+      toast('Export failed — see console');
+    }
+  });
+}
+
+/* -- Build the multi-section PDF -- */
+async function buildExportPDF(selected){
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const form = pdfDoc.getForm();
+
+  const colors = {
+    dark:  rgb(0.08, 0.08, 0.1),
+    body:  rgb(0.20, 0.20, 0.22),
+    dim:   rgb(0.45, 0.45, 0.48),
+    faint: rgb(0.55, 0.55, 0.58),
+    accent:rgb(0.86, 0.62, 0.16),
+    line:  rgb(0.84, 0.85, 0.87),
+    headerBg: rgb(0.92, 0.93, 0.95),
+    zebra: rgb(0.965, 0.966, 0.97),
+  };
+
+  const ctx = makePdfCtx(pdfDoc, font, fontBold, form, colors);
+
+  if(selected.includes('dashboard')) pdfDashboard(ctx);
+  if(selected.includes('kanban')) pdfKanban(ctx);
+  if(selected.includes('workload')) pdfWorkload(ctx);
+  if(selected.includes('projects')) pdfProjects(ctx);
+  if(selected.includes('team')) pdfTeam(ctx);
+  if(selected.includes('bills')) pdfBills(ctx);
+  if(selected.includes('agreements')) pdfAgreements(ctx);
+
+  if(!ctx.page) ctx.header('Ops Console', 'No sections were selected for export.');
+
+  const bytes = await pdfDoc.save();
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ops-console-export.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportBtn').addEventListener('click', openExportModal);
 
 /* ============================= INIT ============================= */
 DB.onReady(() => {
