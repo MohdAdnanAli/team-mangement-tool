@@ -8,7 +8,7 @@ document.getElementById('hamburgerBtn').addEventListener('click', openSidebar);
 sidebarBackdrop.addEventListener('click', closeSidebar);
 
 /* ============================= THEME ============================= */
-let themePref = 'system'; // 'light' | 'dark' | 'system'
+let themePref = 'light'; // 'light' | 'dark' | 'system'
 const systemMedia = window.matchMedia('(prefers-color-scheme: light)');
 
 function applyTheme(){
@@ -344,6 +344,7 @@ function renderKanban(){
       btn.addEventListener('click', e=>{
         e.stopPropagation();
         state.tasks = state.tasks.filter(t=>t.id!==btn.dataset.del);
+        DB.remove('tasks', 'id', btn.dataset.del);
         renderNav(); renderTicker(); drawBoard();
         toast('Ticket removed');
       });
@@ -356,7 +357,7 @@ function renderKanban(){
         col.classList.remove('drag-over');
         const taskId = e.dataTransfer.getData('text/plain');
         const t = state.tasks.find(t=>t.id===taskId);
-        if(t){ t.status = col.dataset.col; renderNav(); renderTicker(); drawBoard(); }
+        if(t){ t.status = col.dataset.col; DB.update('tasks', { status: t.status }, 'id', t.id); renderNav(); renderTicker(); drawBoard(); }
       });
     });
   }
@@ -437,8 +438,9 @@ function renderProjects(){
       const linked = state.tasks.filter(t=>t.projectId===p.id).length;
       const msg = linked ? `Delete "${p.name}"? ${linked} ticket(s) will become unassigned from a project.` : `Delete "${p.name}"?`;
       if(!window.confirm(msg)) return;
-      state.tasks.forEach(t=>{ if(t.projectId===p.id) t.projectId=''; });
+      state.tasks.forEach(t=>{ if(t.projectId===p.id){ t.projectId=''; DB.update('tasks', { projectId:'' }, 'id', t.id); } });
       state.projects = state.projects.filter(x=>x.id!==p.id);
+      DB.remove('projects', 'id', p.id);
       renderNav(); renderTicker(); renderProjects();
       toast('Project deleted');
     });
@@ -482,8 +484,9 @@ function renderTeam(){
       const linked = state.tasks.filter(t=>t.assigneeId===m.id).length;
       const msg = linked ? `Remove ${m.name}? ${linked} ticket(s) will become unassigned.` : `Remove ${m.name}?`;
       if(!window.confirm(msg)) return;
-      state.tasks.forEach(t=>{ if(t.assigneeId===m.id) t.assigneeId=''; });
+      state.tasks.forEach(t=>{ if(t.assigneeId===m.id){ t.assigneeId=''; DB.update('tasks', { assigneeId:'' }, 'id', t.id); } });
       state.members = state.members.filter(x=>x.id!==m.id);
+      DB.remove('members', 'id', m.id);
       renderNav(); renderTicker(); renderTeam();
       toast('Teammate removed');
     });
@@ -558,6 +561,7 @@ function renderBills(){
         const b = state.bills.find(x=>x.id===btn.dataset.billDel);
         if(!b || !window.confirm(`Delete ${b.billNumber}?`)) return;
         state.bills = state.bills.filter(x=>x.id!==b.id);
+        DB.remove('bills', 'id', b.id);
         renderNav(); renderTicker(); renderBills();
         toast('Invoice deleted');
       });
@@ -569,6 +573,7 @@ function renderBills(){
         if(!b) return;
         const next = {draft:'sent', sent:'paid', paid:'paid', overdue:'paid'}[b.status] || 'paid';
         b.status = next;
+        DB.update('bills', { status: b.status }, 'id', b.id);
         renderNav(); renderTicker(); drawBills();
         toast(`Invoice marked as ${next}`);
       });
@@ -583,7 +588,7 @@ function billCardHTML(b){
   const total = sub + tax;
   const overdue = b.status==='sent' && new Date(b.dueDate) < new Date('2026-08-01');
   const effectiveStatus = overdue ? 'overdue' : b.status;
-  if(overdue && b.status!=='overdue'){ b.status='overdue'; }
+  if(overdue && b.status!=='overdue'){ b.status='overdue'; DB.update('bills', { status:'overdue' }, 'id', b.id); }
   const statusCls = billStatusClass(effectiveStatus);
 
   return `
@@ -754,9 +759,11 @@ function openBillModal(existing){
       existing.issueDate = issueDate;
       existing.dueDate = dueDate;
       existing.notes = notes;
+      DB.update('bills', { memberId, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes }, 'id', existing.id);
+      DB.replaceLineItems(existing.id, items);
       toast('Invoice updated');
     } else {
-      state.bills.push({
+      const bill = {
         id: uid('bill'),
         memberId,
         billNumber: nextBillNumber(),
@@ -768,7 +775,11 @@ function openBillModal(existing){
         issueDate,
         dueDate,
         notes,
-      });
+      };
+      state.bills.push(bill);
+      DB.insert('bills', { id: bill.id, memberId, billNumber: bill.billNumber, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes });
+      DB.replaceLineItems(bill.id, items);
+      DB.setMeta('billSeq', state.billSeq);
       toast('Invoice created');
     }
     closeModal(); renderNav(); renderTicker(); renderBills();
@@ -791,9 +802,10 @@ function renderAgreements(){
     </div>
   `;
   document.getElementById('addAgrBtn').addEventListener('click', openAgreementModal);
-  document.querySelectorAll('[data-agr-del]').forEach(btn=>{
+document.querySelectorAll('[data-agr-del]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.agreements = state.agreements.filter(a=>a.id!==btn.dataset.agrDel);
+      DB.remove('agreements', 'id', btn.dataset.agrDel);
       renderNav(); renderAgreements();
       toast('Agreement removed');
     });
@@ -842,7 +854,7 @@ function openAgreementModal(){
     const title = document.getElementById('aTitle').value.trim();
     const terms = document.getElementById('aTerms').value.trim();
     if(!title || !terms){ toast('Add a title and the terms'); return; }
-    state.agreements.push({
+    const agr = {
       id: uid('agr'),
       title,
       party: document.getElementById('aParty').value.trim() || '—',
@@ -850,7 +862,9 @@ function openAgreementModal(){
       status: document.getElementById('aStatus').value,
       dateAgreed: document.getElementById('aDate').value || '2026-07-29',
       terms,
-    });
+    };
+    state.agreements.push(agr);
+    DB.insert('agreements', agr);
     closeModal(); renderNav(); renderAgreements();
     toast('Agreement logged');
   });
@@ -888,7 +902,7 @@ function openTaskModal(){
   document.getElementById('saveTaskBtn').addEventListener('click', ()=>{
     const title = document.getElementById('fTitle').value.trim();
     if(!title){ toast('Give the ticket a title'); return; }
-    state.tasks.push({
+    const task = {
       id: nextTaskId(),
       title,
       projectId: document.getElementById('fProject').value,
@@ -897,7 +911,10 @@ function openTaskModal(){
       priority: document.getElementById('fPriority').value,
       due: document.getElementById('fDue').value || '2026-08-05',
       hours: Number(document.getElementById('fHours').value) || 4,
-    });
+    };
+    state.tasks.push(task);
+    DB.insert('tasks', task);
+    DB.setMeta('taskSeq', state.taskSeq);
     closeModal(); renderNav(); renderTicker(); renderKanban();
     toast('Ticket created');
   });
@@ -922,9 +939,12 @@ function openMemberModal(existing){
     const capacity = Number(document.getElementById('mCap').value) || 40;
     if(existing){
       existing.name = name; existing.role = role; existing.capacity = capacity;
+      DB.update('members', { name, role, capacity }, 'id', existing.id);
       toast('Teammate updated');
     } else {
-      state.members.push({ id: uid('mem'), name, role, capacity });
+      const mem = { id: uid('mem'), name, role, capacity };
+      state.members.push(mem);
+      DB.insert('members', mem);
       toast('Teammate added');
     }
     closeModal(); renderNav(); renderTicker(); renderTeam();
@@ -963,9 +983,12 @@ function openProjectModal(existing){
     const color = document.querySelector('input[name="pColor"]:checked')?.value || '#4FD1C5';
     if(existing){
       existing.name = name; existing.color = color;
+      DB.update('projects', { name, color }, 'id', existing.id);
       toast('Project updated');
     } else {
-      state.projects.push({ id: uid('proj'), name, color });
+      const proj = { id: uid('proj'), name, color };
+      state.projects.push(proj);
+      DB.insert('projects', proj);
       toast('Project created');
     }
     closeModal(); renderNav(); renderTicker(); renderProjects();
@@ -1049,4 +1072,7 @@ async function exportPDF(){
 document.getElementById('exportBtn').addEventListener('click', exportPDF);
 
 /* ============================= INIT ============================= */
-render();
+DB.onReady(() => {
+  DB.restoreState(state);
+  render();
+});
