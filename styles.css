@@ -84,8 +84,9 @@
     border-right:1px solid var(--border);
     padding:20px 14px;
     display:flex; flex-direction:column;
-    position:sticky; top:0; height:100vh;
-    overflow-y:auto;
+    /* No fixed height / sticky — the sidebar stretches with the page content
+       (shell has min-height:100vh), so the footer stays pinned to the bottom
+       of the sidebar via margin-top:auto no matter how long the page is. */
   }
   @media (max-width:800px){
     .mobile-topbar{ display:flex; }
@@ -95,7 +96,15 @@
       transition:transform .22s ease;
       box-shadow:0 0 0 rgba(0,0,0,0);
       width:min(260px, 82vw);
+      overflow:hidden;
     }
+    #navList{
+      flex:1;
+      overflow-y:auto;
+      min-height:0;
+      padding-bottom:6px;
+    }
+    #navList::-webkit-scrollbar{width:5px;}
     .sidebar.open{ transform:translateX(0); box-shadow:10px 0 30px rgba(0,0,0,0.35); }
   }
 
@@ -192,6 +201,50 @@
   .chart-wrap.tall{height:280px;}
 
   .full-span{grid-column:1 / -1;}
+  .panel-head-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .panel-head-row .panel-title{margin-bottom:0;}
+
+  /* ===== Dashboard deadlines ===== */
+  .deadline-row{
+    display:flex; align-items:center; gap:12px;
+    padding:9px 4px; border-bottom:1px solid var(--border-soft);
+  }
+  .deadline-row:last-child{border-bottom:none;}
+  .deadline-dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+  .deadline-dot.overdue{background:var(--danger); box-shadow:0 0 0 3px var(--danger-dim);}
+  .deadline-dot.today{background:var(--amber); box-shadow:0 0 0 3px var(--amber-dim);}
+  .deadline-dot.soon{background:var(--blue); box-shadow:0 0 0 3px rgba(138,164,255,0.14);}
+  .deadline-main{flex:1; min-width:0;}
+  .deadline-title{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .deadline-row.overdue .deadline-title{color:var(--danger);}
+  .deadline-sub{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-top:2px;}
+  .deadline-badge{
+    font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.4px;
+    padding:3px 8px; border-radius:10px; flex-shrink:0; text-transform:uppercase;
+  }
+  .deadline-badge.overdue{background:var(--danger-dim); color:var(--danger);}
+  .deadline-badge.today{background:var(--amber-dim); color:var(--amber);}
+  .deadline-badge.soon{background:rgba(138,164,255,0.14); color:var(--blue);}
+
+  /* ===== Dashboard project health ===== */
+  .health-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:12px;}
+  .health-card{
+    background:var(--surface-raised); border:1px solid var(--border);
+    border-radius:var(--radius); padding:12px 14px;
+  }
+  .health-card-top{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+  .health-name{font-weight:600; font-size:13px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .health-flag{
+    font-family:var(--font-mono); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+    padding:3px 8px; border-radius:10px; flex-shrink:0;
+  }
+  .health-flag.risk{background:var(--danger-dim); color:var(--danger);}
+  .health-flag.good{background:var(--success-dim); color:var(--success);}
+  .health-flag.warn{background:var(--amber-dim); color:var(--amber);}
+  .health-flag.done{background:var(--teal-dim); color:var(--teal);}
+  .health-flag.todo{background:var(--surface-raised); color:var(--text-faint); border:1px solid var(--border);}
+  .health-meta{display:flex; justify-content:space-between; margin-top:7px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);}
+  .health-card .bar-track{height:7px;}
 
   /* ===== Kanban — "punch ticket" cards ===== */
   .kanban-board{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; align-items:start;}
