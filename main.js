@@ -132,7 +132,25 @@ let charts = {};
 function member(id){ return state.members.find(m=>m.id===id); }
 function project(id){ return state.projects.find(p=>p.id===id); }
 function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
-function isOverdue(task){ return task.status!=='done' && new Date(task.due) < new Date('2026-07-29'); }
+/* -- Present-day helpers (verification is always against "now", never a saved date) -- */
+function todayUTC(){
+  const n = new Date();
+  return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()));
+}
+function todayStr(){
+  return todayUTC().toISOString().slice(0,10);
+}
+function addDaysStr(days){
+  const d = todayUTC();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function monthEndStr(){
+  const n = new Date();
+  const end = new Date(Date.UTC(n.getFullYear(), n.getMonth() + 1, 0));
+  return end.toISOString().slice(0,10);
+}
+function isOverdue(task){ return task.status!=='done' && new Date(task.due) < todayUTC(); }
 function fmtDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-US',{month:'short', day:'numeric'}); }
 
 /* ============================= BILL HELPERS ============================= */
@@ -219,7 +237,7 @@ function renderDashboard(){
     <div class="view-head">
       <div>
         <div class="view-title">Dashboard</div>
-        <div class="view-sub">SNAPSHOT — ${new Date('2026-07-29').toDateString().toUpperCase()}</div>
+        <div class="view-sub">SNAPSHOT — ${new Date().toDateString().toUpperCase()}</div>
       </div>
     </div>
     <div class="dash-grid">
@@ -586,7 +604,7 @@ function billCardHTML(b){
   const sub = calcSubtotal(b.lineItems);
   const tax = calcTax(sub, b.taxRate);
   const total = sub + tax;
-  const overdue = b.status==='sent' && new Date(b.dueDate) < new Date('2026-08-01');
+  const overdue = b.status==='sent' && new Date(b.dueDate) < todayUTC();
   const effectiveStatus = overdue ? 'overdue' : b.status;
   if(overdue && b.status!=='overdue'){ b.status='overdue'; DB.update('bills', { status:'overdue' }, 'id', b.id); }
   const statusCls = billStatusClass(effectiveStatus);
@@ -665,8 +683,8 @@ function openBillModal(existing){
     <div class="modal-title">${existing ? 'Edit invoice' : 'New invoice'}</div>
     <div class="field"><label>Bill to (team member)</label><select id="fBillMember">${memberOptions}</select></div>
     <div class="row2">
-      <div class="field"><label>Period start</label><input id="fPeriodStart" type="date" value="${existing ? existing.periodStart : '2026-08-01'}"></div>
-      <div class="field"><label>Period end</label><input id="fPeriodEnd" type="date" value="${existing ? existing.periodEnd : '2026-08-31'}"></div>
+      <div class="field"><label>Period start</label><input id="fPeriodStart" type="date" value="${existing ? existing.periodStart : todayStr()}"></div>
+      <div class="field"><label>Period end</label><input id="fPeriodEnd" type="date" value="${existing ? existing.periodEnd : monthEndStr()}"></div>
     </div>
     <div class="field">
       <label>Line items</label>
@@ -678,8 +696,8 @@ function openBillModal(existing){
       <div class="field"><label>Status</label><select id="fBillStatus">${statusOptions}</select></div>
     </div>
     <div class="row2">
-      <div class="field"><label>Issue date</label><input id="fIssueDate" type="date" value="${existing ? existing.issueDate : '2026-08-01'}"></div>
-      <div class="field"><label>Due date</label><input id="fDueDate" type="date" value="${existing ? existing.dueDate : '2026-08-15'}"></div>
+      <div class="field"><label>Issue date</label><input id="fIssueDate" type="date" value="${existing ? existing.issueDate : todayStr()}"></div>
+      <div class="field"><label>Due date</label><input id="fDueDate" type="date" value="${existing ? existing.dueDate : addDaysStr(15)}"></div>
     </div>
     <div class="field"><label>Notes / Payment terms</label><textarea id="fBillNotes" rows="3" placeholder="e.g. Payment via NEFT within 15 days...">${existing ? escapeHTML(existing.notes||'') : ''}</textarea></div>
     <div class="modal-actions">
@@ -842,7 +860,7 @@ function openAgreementModal(){
       <div class="field"><label>Amount / rate (optional)</label><input id="aAmount" placeholder="e.g. ₹1,20,000/month"></div>
       <div class="field"><label>Status</label><select id="aStatus"><option value="active">Active</option><option value="settled">Settled</option><option value="disputed">Disputed</option></select></div>
     </div>
-    <div class="field"><label>Date agreed</label><input id="aDate" type="date" value="2026-07-29"></div>
+    <div class="field"><label>Date agreed</label><input id="aDate" type="date" value="${todayStr()}"></div>
     <div class="field"><label>Terms (write it exactly as agreed)</label><textarea id="aTerms" rows="5" placeholder="What was verbally agreed — scope, billing, when it ends, exceptions..."></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
@@ -860,7 +878,7 @@ function openAgreementModal(){
       party: document.getElementById('aParty').value.trim() || '—',
       amount: document.getElementById('aAmount').value.trim(),
       status: document.getElementById('aStatus').value,
-      dateAgreed: document.getElementById('aDate').value || '2026-07-29',
+      dateAgreed: document.getElementById('aDate').value || todayStr(),
       terms,
     };
     state.agreements.push(agr);
@@ -892,7 +910,7 @@ function openTaskModal(){
       <div class="field"><label>Priority</label><select id="fPriority"><option value="low">Low</option><option value="med" selected>Medium</option><option value="high">High</option></select></div>
       <div class="field"><label>Estimate (hrs)</label><input id="fHours" type="number" min="1" value="4"></div>
     </div>
-    <div class="field"><label>Due date</label><input id="fDue" type="date" value="2026-08-05"></div>
+    <div class="field"><label>Due date</label><input id="fDue" type="date" value="${addDaysStr(7)}"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
       <button class="btn btn-primary" id="saveTaskBtn">Create ticket</button>
@@ -909,7 +927,7 @@ function openTaskModal(){
       assigneeId: document.getElementById('fMember').value,
       status: 'todo',
       priority: document.getElementById('fPriority').value,
-      due: document.getElementById('fDue').value || '2026-08-05',
+      due: document.getElementById('fDue').value || addDaysStr(7),
       hours: Number(document.getElementById('fHours').value) || 4,
     };
     state.tasks.push(task);
@@ -1177,7 +1195,7 @@ function drawTable(ctx, headers, rows, widths, opts = {}){
 
 /* -- Section renderers -- */
 function pdfDashboard(ctx){
-  ctx.header('Dashboard', 'SNAPSHOT — ' + new Date('2026-07-29').toDateString().toUpperCase());
+  ctx.header('Dashboard', 'SNAPSHOT — ' + new Date().toDateString().toUpperCase());
 
   const total = state.tasks.length;
   const doneCount = state.tasks.filter(t => t.status === 'done').length;
