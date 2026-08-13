@@ -108,6 +108,7 @@ const DB = (() => {
       billNumber TEXT NOT NULL DEFAULT '',
       periodStart TEXT NOT NULL DEFAULT '',
       periodEnd TEXT NOT NULL DEFAULT '',
+      flags TEXT DEFAULT '',
       taxRate INTEGER NOT NULL DEFAULT 18,
       issueDate TEXT NOT NULL DEFAULT '',
       dueDate TEXT NOT NULL DEFAULT '',
@@ -334,6 +335,9 @@ const DB = (() => {
     // Restore line items into bills
     for (const bill of state.bills) {
       bill.lineItems = queryAll('SELECT * FROM line_items WHERE billId=? ORDER BY id', [bill.id]);
+      try{
+        bill.flags = bill.flags ? JSON.parse(bill.flags) : [];
+      }catch(e){ bill.flags = []; }
     }
 
     state.taskSeq = parseInt(getMeta('taskSeq', '13'));

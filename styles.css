@@ -456,6 +456,15 @@
 .status-pill.paid{background:var(--teal-dim); color:var(--teal);}
 .status-pill.overdue{background:var(--danger-dim); color:var(--danger);}
 
+/* ===== Invoice flag pills ===== */
+.invoice-flags{display:flex; align-items:center; gap:8px; margin-left:6px;}
+.flag-pill{font-family:var(--font-mono); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; padding:4px 8px; border-radius:999px; color:#fff; display:inline-block}
+.flag-pill.urgent{background:var(--danger);} /* red */
+.flag-pill.reviewed{background:var(--blue);} /* blue */
+.flag-pill.recurring{background:var(--teal);} /* teal */
+.flag-pill.tax-exempt{background:#9B6EE3;} /* purple */
+.flag-pill.final{background:#F2B84B; color:#1a1400;} /* amber with dark text */
+
 .bill-empty{text-align:center; padding:40px 10px; color:var(--text-faint); font-family:var(--font-mono); font-size:12px;}
 
 .line-item-row{display:grid; grid-template-columns:2fr 80px 80px 80px auto; gap:8px; align-items:center; margin-bottom:6px;}

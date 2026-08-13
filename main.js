@@ -67,6 +67,7 @@ const state = {
     {
       id:'bill-1',
       memberId:'mem-1',
+      flags:['urgent','reviewed'],
       billNumber:'INV-001',
       periodStart:'2026-07-01',
       periodEnd:'2026-07-31',
@@ -83,6 +84,7 @@ const state = {
     {
       id:'bill-2',
       memberId:'mem-3',
+      flags:['recurring'],
       billNumber:'INV-002',
       periodStart:'2026-07-01',
       periodEnd:'2026-07-31',
@@ -730,6 +732,7 @@ function billCardHTML(b){
         <div class="invoice-head-left">
           <span class="invoice-num">${b.billNumber}</span>
           <span class="invoice-member">${m ? escapeHTML(m.name) : 'Unassigned'}</span>
+          ${b.flags && b.flags.length ? `<span class="invoice-flags">${b.flags.map(f=>`<span class="flag-pill ${f}">${escapeHTML(f.charAt(0).toUpperCase()+f.slice(1))}</span>`).join('')}</span>` : ''}
           <span class="status-pill ${statusCls}">${effectiveStatus}</span>
         </div>
         <div class="invoice-head-right">
@@ -814,6 +817,16 @@ function openBillModal(existing){
       <div class="field"><label>Issue date</label><input id="fIssueDate" type="date" value="${existing ? existing.issueDate : todayStr()}"></div>
       <div class="field"><label>Due date</label><input id="fDueDate" type="date" value="${existing ? existing.dueDate : addDaysStr(15)}"></div>
     </div>
+    <div class="field">
+      <label>Flags</label>
+      <div class="color-swatches" id="flagOptions">
+        ${['urgent','reviewed','recurring','tax-exempt','final'].map(f=>`<label class="color-swatch-opt ${existing && existing.flags && existing.flags.includes(f) ? 'selected':''}">
+            <input type="checkbox" class="flag-checkbox" value="${f}" ${existing && existing.flags && existing.flags.includes(f) ? 'checked':''}>
+            <span class="swatch-dot" style="background: ${f==='urgent'?'var(--danger)':f==='reviewed'?'var(--blue)':f==='recurring'?'var(--teal)':f==='tax-exempt'?'#9B6EE3':'var(--amber)'}"></span>
+            <span class="swatch-hex">${f.charAt(0).toUpperCase()+f.slice(1).replace('-',' ')}</span>
+          </label>`).join('')}
+      </div>
+    </div>
     <div class="field"><label>Notes / Payment terms</label><textarea id="fBillNotes" rows="3" placeholder="e.g. Payment via NEFT within 15 days...">${existing ? escapeHTML(existing.notes||'') : ''}</textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
@@ -892,7 +905,10 @@ function openBillModal(existing){
       existing.issueDate = issueDate;
       existing.dueDate = dueDate;
       existing.notes = notes;
+      const flags = Array.from(document.querySelectorAll('.flag-checkbox:checked')).map(i=>i.value);
+      existing.flags = flags;
       DB.update('bills', { memberId, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes }, 'id', existing.id);
+      DB.update('bills', { flags: JSON.stringify(existing.flags) }, 'id', existing.id);
       DB.replaceLineItems(existing.id, items);
       toast('Invoice updated');
     } else {
@@ -908,9 +924,10 @@ function openBillModal(existing){
         issueDate,
         dueDate,
         notes,
+        flags: Array.from(document.querySelectorAll('.flag-checkbox:checked')).map(i=>i.value),
       };
       state.bills.push(bill);
-      DB.insert('bills', { id: bill.id, memberId, billNumber: bill.billNumber, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes });
+      DB.insert('bills', { id: bill.id, memberId, billNumber: bill.billNumber, periodStart, periodEnd, flags: JSON.stringify(bill.flags), taxRate, issueDate, dueDate, status, notes });
       DB.replaceLineItems(bill.id, items);
       DB.setMeta('billSeq', state.billSeq);
       toast('Invoice created');
