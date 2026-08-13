@@ -224,6 +224,17 @@ const DB = (() => {
       // Ensure schema exists
       db.run(SCHEMA);
 
+      // Migration: add `flags` column to bills if it doesn't exist (for existing DBs)
+      try{
+        const pragma = db.exec("PRAGMA table_info('bills')");
+        if(pragma && pragma.length && pragma[0].values){
+          const cols = pragma[0].values.map(v => v[1]);
+          if(!cols.includes('flags')){
+            db.run("ALTER TABLE bills ADD COLUMN flags TEXT DEFAULT ''");
+          }
+        }
+      }catch(e){ console.warn('Migration check for bills.flags failed', e); }
+
       // Seed if empty
       seedDefaults();
       seedAgreements();

@@ -1449,6 +1449,26 @@ function pdfBills(ctx){
     const total = sub + tax;
     ctx.sectionTitle(b.billNumber + ' — ' + (m ? m.name : 'Unassigned') + '  ·  ' + b.status);
     ctx.paragraph('Period: ' + b.periodStart + ' → ' + b.periodEnd + '   |   Issued: ' + b.issueDate + '   |   Due: ' + b.dueDate, 8.5, ctx.colors.faint, 11);
+    if(b.flags && b.flags.length){
+      // Draw small colored markers for each flag with label
+      ctx.ensureSpace(18);
+      let fx = MARGIN;
+      const flagToColor = (f) => {
+        if(f==='urgent') return rgb(0.91,0.41,0.41); // red
+        if(f==='reviewed') return rgb(0.54,0.64,1.0); // blue
+        if(f==='recurring') return rgb(0.31,0.82,0.75); // teal
+        if(f==='tax-exempt') return rgb(0.61,0.43,0.89); // purple
+        if(f==='final') return rgb(0.95,0.72,0.31); // amber
+        return ctx.colors.dim;
+      };
+      for(const f of b.flags){
+        const col = flagToColor(f);
+        ctx.page.drawRectangle({ x: fx, y: ctx.y - 12, width: 10, height: 10, color: col });
+        ctx.page.drawText(sanitizePdfText(f.charAt(0).toUpperCase()+f.slice(1).replace('-',' ')), { x: fx + 14, y: ctx.y - 2, size: 9, font: ctx.font, color: ctx.colors.faint });
+        fx += 84;
+      }
+      ctx.y -= 18;
+    }
     drawTable(ctx,
       ['Description', 'Hours', 'Rate', 'Amount'],
       b.lineItems.map(li => [li.description, String(li.hours), formatCurrency(li.rate) + '/hr', formatCurrency(li.hours * li.rate)]),
