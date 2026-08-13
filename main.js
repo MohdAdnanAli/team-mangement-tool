@@ -1454,17 +1454,18 @@ function pdfBills(ctx){
       ctx.ensureSpace(18);
       let fx = MARGIN;
       const flagToColor = (f) => {
-        if(f==='urgent') return ctx.colors.flagUrgent;
-        if(f==='reviewed') return ctx.colors.flagReviewed;
-        if(f==='recurring') return ctx.colors.flagRecurring;
-        if(f==='tax-exempt') return ctx.colors.flagTaxExempt;
-        if(f==='final') return ctx.colors.flagFinal;
+        const key = normalizeFlag(f);
+        if(key==='urgent') return ctx.colors.flagUrgent;
+        if(key==='reviewed') return ctx.colors.flagReviewed;
+        if(key==='recurring') return ctx.colors.flagRecurring;
+        if(key==='tax-exempt') return ctx.colors.flagTaxExempt;
+        if(key==='final') return ctx.colors.flagFinal;
         return ctx.colors.dim;
       };
       for(const f of b.flags){
         const col = flagToColor(f);
         ctx.page.drawRectangle({ x: fx, y: ctx.y - 12, width: 10, height: 10, color: col });
-        ctx.page.drawText(sanitizePdfText(f.charAt(0).toUpperCase()+f.slice(1).replace('-',' ')), { x: fx + 14, y: ctx.y - 2, size: 9, font: ctx.font, color: ctx.colors.faint });
+        ctx.page.drawText(sanitizePdfText(getFlagLabel(f)), { x: fx + 14, y: ctx.y - 2, size: 9, font: ctx.font, color: ctx.colors.faint });
         fx += 84;
       }
       ctx.y -= 18;
@@ -1546,21 +1547,31 @@ async function buildExportPDF(selected){
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const form = pdfDoc.getForm();
 
+  const rgbFn = (typeof rgb === 'function')
+    ? rgb
+    : (r, g, b) => {
+        try {
+          return PDFLib && typeof PDFLib.rgb === 'function' ? PDFLib.rgb(r, g, b) : { r, g, b };
+        } catch (e) {
+          return { r, g, b };
+        }
+      };
+
   const colors = {
-    dark:  rgb(0.08, 0.08, 0.1),
-    body:  rgb(0.20, 0.20, 0.22),
-    dim:   rgb(0.45, 0.45, 0.48),
-    faint: rgb(0.55, 0.55, 0.58),
-    accent:rgb(0.86, 0.62, 0.16),
-    line:  rgb(0.84, 0.85, 0.87),
-    headerBg: rgb(0.92, 0.93, 0.95),
-    zebra: rgb(0.965, 0.966, 0.97),
+    dark:  rgbFn(0.08, 0.08, 0.1),
+    body:  rgbFn(0.20, 0.20, 0.22),
+    dim:   rgbFn(0.45, 0.45, 0.48),
+    faint: rgbFn(0.55, 0.55, 0.58),
+    accent:rgbFn(0.86, 0.62, 0.16),
+    line:  rgbFn(0.84, 0.85, 0.87),
+    headerBg: rgbFn(0.92, 0.93, 0.95),
+    zebra: rgbFn(0.965, 0.966, 0.97),
     // Flag colors
-    flagUrgent: rgb(0.91,0.41,0.41),
-    flagReviewed: rgb(0.54,0.64,1.0),
-    flagRecurring: rgb(0.31,0.82,0.75),
-    flagTaxExempt: rgb(0.61,0.43,0.89),
-    flagFinal: rgb(0.95,0.72,0.31),
+    flagUrgent: rgbFn(0.91,0.41,0.41),
+    flagReviewed: rgbFn(0.54,0.64,1.0),
+    flagRecurring: rgbFn(0.31,0.82,0.75),
+    flagTaxExempt: rgbFn(0.61,0.43,0.89),
+    flagFinal: rgbFn(0.95,0.72,0.31),
   };
 
   const ctx = makePdfCtx(pdfDoc, font, fontBold, form, colors);
