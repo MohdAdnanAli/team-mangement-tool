@@ -141,54 +141,10 @@ let charts = {};
 window.state = state;
 window.STATUS_COLS = STATUS_COLS;
 
-/* ============================= HELPERS ============================= */
-function member(id){ return state.members.find(m=>m.id===id); }
-function project(id){ return state.projects.find(p=>p.id===id); }
-function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
-/* -- Present-day helpers (verification is always against "now", never a saved date) -- */
-function todayUTC(){
-  const n = new Date();
-  return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()));
-}
-function todayStr(){
-  return todayUTC().toISOString().slice(0,10);
-}
-function addDaysStr(days){
-  const d = todayUTC();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0,10);
-}
-function monthEndStr(){
-  const n = new Date();
-  const end = new Date(Date.UTC(n.getFullYear(), n.getMonth() + 1, 0));
-  return end.toISOString().slice(0,10);
-}
-function isOverdue(task){ return task.status!=='done' && new Date(task.due) < todayUTC(); }
-function fmtDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-US',{month:'short', day:'numeric'}); }
-
-/* ============================= BILL HELPERS ============================= */
-function formatCurrency(n){ return '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:0, maximumFractionDigits:0}); }
-function calcSubtotal(items){ return items.reduce((s,i)=> s + (i.hours * i.rate), 0); }
-function calcTax(subtotal, rate){ return Math.round(subtotal * (rate/100)); }
-function calcBillTotal(bill){
-  const sub = calcSubtotal(bill.lineItems);
-  return sub + calcTax(sub, bill.taxRate);
-}
-function nextBillNumber(){
-  state.billSeq++;
-  return 'INV-' + String(state.billSeq).padStart(3,'0');
-}
-function billMember(bill){ return member(bill.memberId); }
-function billStatusClass(s){ return s==='paid'?'success':s==='overdue'?'danger':s==='sent'?'amber':s==='draft'?'':'teal'; }
-
-function toast(msg){
-  const t=document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 3200);
-}
-function nextTaskId(){ state.taskSeq++; return 'TSK-' + String(state.taskSeq).padStart(3,'0'); }
+/* ============================= HELPERS (lazy-loaded) ============================= */
+// Load helper functions into the global scope to keep initial parse small.
+window._helpersReady = import('./modules/helpers.js').then(h=>{ Object.assign(window, h); }).catch(err=>{ console.error('Failed to load helpers:', err); });
+window._modalsReady = import('./modules/modals.js').then(m=>{ Object.assign(window, m); if(window.initModalBackdrop) window.initModalBackdrop(); return m; }).catch(err=>{ console.error('Failed to load modals:', err); });
 
 /* ============================= NAV ============================= */
 const NAV = [
@@ -244,356 +200,12 @@ function renderTicker(){
 }
 
 /* ============================= DASHBOARD ============================= */
-function renderDashboard(){
-  const view = document.getElementById('view');
-  view.innerHTML = `
-    <div class="view-head">
-      <div>
-        <div class="view-title">Dashboard</div>
-        <div class="view-sub">SNAPSHOT — ${new Date().toDateString().toUpperCase()}</div>
-      </div>
-      <div class="view-actions">
-        <button class="btn btn-primary" id="dashQuickAddBtn">+ Quick add ticket</button>
-      </div>
-    </div>
-    <div class="dash-grid">
-      <div class="panel"><div class="panel-title">Tasks by status</div><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div>
-      <div class="panel"><div class="panel-title">Workload by teammate (hrs)</div><div class="chart-wrap"><canvas id="chartWorkload"></canvas></div></div>
-      <div class="panel full-span"><div class="panel-title">Project progress</div><div class="chart-wrap tall"><canvas id="chartProjects"></canvas></div></div>
-      <div class="panel full-span">
-        <div class="panel-head-row">
-          <div class="panel-title">Deadlines — overdue &amp; next 7 days</div>
-          <button class="btn btn-sm btn-ghost" id="dashOpenBoard">Open board →</button>
-        </div>
-        <div id="dashDeadlines"></div>
-      </div>
-      <div class="panel full-span">
-        <div class="panel-title">Project health</div>
-        <div id="dashHealth" class="health-grid"></div>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('dashQuickAddBtn').addEventListener('click', openTaskModal);
-  document.getElementById('dashOpenBoard').addEventListener('click', ()=>{
-    state.view = 'kanban';
-    render();
-  });
-
-  // Initialize charts lazily to reduce initial parse cost
-  import('./modules/charts.js').then(mod => mod.initDashboardCharts(charts)).catch(err=>{
-    console.error('Chart render failed:', err);
-    document.querySelectorAll('.chart-wrap').forEach(el=>{
-      el.innerHTML = '<div class="empty">Chart unavailable right now — figures are still accurate in the other views.</div>';
-    });
-  });
-
-  renderDeadlines();
-  renderHealth();
-}
-
-function renderDeadlines(){
-  const el = document.getElementById('dashDeadlines');
-  if(!el) return;
-
-  const open = state.tasks.filter(t=>t.status!=='done');
-  const today = todayUTC();
-
-  const overdue = open.filter(t => new Date(t.due) < today).sort((a,b)=> new Date(a.due)-new Date(b.due));
-  const upcoming = open.filter(t => {
-    const diff = Math.ceil((new Date(t.due) - today) / 86400000);
-    return diff >= 0 && diff <= 7;
-  }).sort((a,b)=> new Date(a.due)-new Date(b.due));
-
-  const items = [
-    ...overdue.map(t=>({ t, kind:'overdue', diff: Math.max(0, Math.floor((today - new Date(t.due)) / 86400000)) })),
-    ...upcoming.map(t=>{
-      const diff = Math.ceil((new Date(t.due) - today) / 86400000);
-      return { t, kind: diff===0 ? 'today' : 'soon', diff };
-    }),
-  ];
-
-  if(items.length===0){
-    el.innerHTML = `<div class="empty">All clear — no overdue or upcoming deadlines in the next 7 days.</div>`;
-    return;
-  }
-
-  el.innerHTML = items.map(({t, kind, diff})=>{
-    const m = member(t.assigneeId);
-    const p = project(t.projectId);
-    const label = kind==='overdue' ? `${diff}d late` : kind==='today' ? 'Due today' : `in ${diff}d`;
-    return `
-      <div class="deadline-row ${kind}">
-        <span class="deadline-dot ${kind}"></span>
-        <div class="deadline-main">
-          <div class="deadline-title">${escapeHTML(t.title)}</div>
-          <div class="deadline-sub">
-            <span class="ticket-id">${t.id}</span>
-            <span>·</span>
-            <span class="tag prio-${t.priority}">${t.priority}</span>
-            <span>·</span>
-            <span>${p ? escapeHTML(p.name) : 'No project'}</span>
-            ${m ? `<span>·</span><span>${escapeHTML(m.name)}</span>` : ''}
-          </div>
-        </div>
-        <span class="deadline-badge ${kind}">${label}</span>
-      </div>`;
-  }).join('');
-}
-
-function renderHealth(){
-  const el = document.getElementById('dashHealth');
-  if(!el) return;
-
-  if(state.projects.length===0){
-    el.innerHTML = `<div class="empty">No projects yet — create one from the Projects view.</div>`;
-    return;
-  }
-
-  el.innerHTML = state.projects.map(p=>{
-    const tasks = state.tasks.filter(t=>t.projectId===p.id);
-    const done = tasks.filter(t=>t.status==='done').length;
-    const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
-    const overdueCount = tasks.filter(isOverdue).length;
-    const inProgress = tasks.filter(t=>t.status==='progress' || t.status==='review').length;
-
-    let flag = 'done', flagLabel = 'Done';
-    if(tasks.length){
-      if(overdueCount > 0){ flag='risk'; flagLabel = `${overdueCount} overdue`; }
-      else if(pct >= 100){ flag='done'; flagLabel = 'Complete'; }
-      else if(pct >= 50){ flag='good'; flagLabel = 'On track'; }
-      else if(inProgress > 0 || pct > 0){ flag='warn'; flagLabel = 'In progress'; }
-      else { flag='todo'; flagLabel = 'Not started'; }
-    } else {
-      flag='todo'; flagLabel = 'No tickets';
-    }
-
-    return `
-      <div class="health-card">
-        <div class="health-card-top">
-          <span class="swatch-dot-sm" style="background:${p.color}"></span>
-          <span class="health-name">${escapeHTML(p.name)}</span>
-          <span class="health-flag ${flag}">${flagLabel}</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${p.color};"></div></div>
-        <div class="health-meta">
-          <span>${done}/${tasks.length} done</span>
-          <span>${pct}%</span>
-        </div>
-      </div>`;
-  }).join('');
-}
+/* Dashboard renderer moved to modules/renderers/dashboard.js */
 
 /* ============================= KANBAN ============================= */
-function renderKanban(){
-  const view = document.getElementById('view');
-  const projOptions = state.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  const memberOptions = state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+/* Kanban renderer moved to modules/renderers/kanban.js */
 
-  view.innerHTML = `
-    <div class="view-head">
-      <div>
-        <div class="view-title">Kanban</div>
-        <div class="view-sub">DRAG TICKETS BETWEEN COLUMNS</div>
-      </div>
-      <div class="view-actions">
-        <select class="filter" id="filterProject"><option value="">All projects</option>${projOptions}</select>
-        <select class="filter" id="filterMember"><option value="">All teammates</option>${memberOptions}</select>
-        <select class="filter" id="filterLabel"><option value="">All labels</option></select>
-        <button class="btn btn-primary" id="addTaskBtn">+ New ticket</button>
-      </div>
-    </div>
-    <div class="kanban-board" id="kanbanBoard"></div>
-  `;
-
-  document.getElementById('addTaskBtn').addEventListener('click', openTaskModal);
-  document.getElementById('filterProject').addEventListener('change', drawBoard);
-  document.getElementById('filterMember').addEventListener('change', drawBoard);
-
-  function drawBoard(){
-    const fp = document.getElementById('filterProject').value;
-    const fm = document.getElementById('filterMember').value;
-    const fl = document.getElementById('filterLabel') ? document.getElementById('filterLabel').value : '';
-    const filtered = state.tasks.filter(t => (!fp || t.projectId===fp) && (!fm || t.assigneeId===fm));
-    const filteredByLabel = filtered.filter(t => {
-      if(!fl) return true;
-      try{
-        const meta = typeof t.meta === 'string' ? JSON.parse(t.meta) : (t.meta || {});
-        return Array.isArray(meta.labels) && meta.labels.includes(fl);
-      }catch(e){ return false; }
-    });
-    const board = document.getElementById('kanbanBoard');
-    board.innerHTML = STATUS_COLS.map(col=>{
-      const tasks = filteredByLabel.filter(t=>t.status===col.key);
-      return `
-        <div class="kanban-col" data-col="${col.key}">
-          <div class="kanban-col-head"><span>${col.label}</span><span>${tasks.length}</span></div>
-          <div class="kanban-col-body" data-dropzone="${col.key}">
-            ${tasks.length ? tasks.map(ticketHTML).join('') : '<div class="empty">— empty —</div>'}
-          </div>
-        </div>`;
-    }).join('');
-    wireDnD();
-  }
-  drawBoard();
-
-  // populate label filter with known labels
-  updateLabelFilter();
-
-
-// Populate the label filter dropdown from current tasks
-function updateLabelFilter(){
-  const labelSelect = document.getElementById('filterLabel');
-  if(!labelSelect) return;
-  // clear existing except the first option
-  while(labelSelect.options.length>1) labelSelect.remove(1);
-  const allLabels = new Set();
-  state.tasks.forEach(t=>{
-    try{ const meta = typeof t.meta === 'string' ? JSON.parse(t.meta) : (t.meta||{}); if(meta.labels && Array.isArray(meta.labels)) meta.labels.forEach(l=>allLabels.add(l)); }catch(e){}
-  });
-  Array.from(allLabels).forEach(l=>{ const opt = document.createElement('option'); opt.value = l; opt.textContent = l; labelSelect.appendChild(opt); });
-  labelSelect.onchange = () => render();
-}
-  function ticketHTML(t){
-    const m = member(t.assigneeId);
-    const p = project(t.projectId);
-    const overdue = isOverdue(t);
-    const labels = (t.meta && t.meta.labels) ? (Array.isArray(t.meta.labels) ? t.meta.labels : (typeof t.meta === 'string' ? (JSON.parse(t.meta).labels||[]) : [])) : [];
-    const labelsHTML = labels.length ? labels.map(l=>`<span class="label-pill" style="background:${l}"></span>`).join('') : '';
-    return `
-      <div class="ticket" draggable="true" data-task="${t.id}">
-        <div class="ticket-meta">
-          <span class="ticket-id">${t.id}</span>
-          <button class="ticket-del" data-del="${t.id}" title="Delete">✕</button>
-        </div>
-        <div class="ticket-title">${escapeHTML(t.title)}</div>
-        <div style="margin-top:6px">${labelsHTML}</div>
-        <div class="ticket-meta">
-          <span class="tag prio-${t.priority}">${t.priority}</span>
-          <span class="avatar" title="${m?m.name:'Unassigned'}">${m?initials(m.name):'—'}</span>
-        </div>
-        <div class="ticket-foot">
-          <span><span class="proj-dot" style="background:${p?p.color:'#666'}"></span>${p?p.name:'—'}</span>
-          <span class="due-chip ${overdue?'overdue':''}">${fmtDate(t.due)}</span>
-        </div>
-      </div>`;
-  }
-
-  function wireDnD(){
-    document.querySelectorAll('.ticket').forEach(el=>{
-      el.addEventListener('dragstart', e=>{
-        e.dataTransfer.setData('text/plain', el.dataset.task);
-        el.classList.add('dragging');
-      });
-      el.addEventListener('dragend', ()=> el.classList.remove('dragging'));
-      el.addEventListener('click', ()=> openCardModal(el.dataset.task));
-    });
-    document.querySelectorAll('[data-del]').forEach(btn=>{
-      btn.addEventListener('click', e=>{
-        e.stopPropagation();
-        state.tasks = state.tasks.filter(t=>t.id!==btn.dataset.del);
-        DB.remove('tasks', 'id', btn.dataset.del);
-        renderNav(); renderTicker(); drawBoard();
-        toast('Ticket removed');
-      });
-    });
-    document.querySelectorAll('.kanban-col').forEach(col=>{
-      col.addEventListener('dragover', e=>{ e.preventDefault(); col.classList.add('drag-over'); });
-      col.addEventListener('dragleave', ()=> col.classList.remove('drag-over'));
-      col.addEventListener('drop', e=>{
-        e.preventDefault();
-        col.classList.remove('drag-over');
-        const taskId = e.dataTransfer.getData('text/plain');
-        const t = state.tasks.find(t=>t.id===taskId);
-        if(t){ t.status = col.dataset.col; DB.update('tasks', { status: t.status }, 'id', t.id); renderNav(); renderTicker(); drawBoard(); }
-      });
-    });
-  }
-}
-
-function escapeHTML(s){
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-/* ============================= WORKLOAD ============================= */
-function renderWorkload(){
-  const view = document.getElementById('view');
-  view.innerHTML = `
-    <div class="view-head">
-      <div><div class="view-title">Workload</div><div class="view-sub">ACTIVE HOURS VS WEEKLY CAPACITY</div></div>
-    </div>
-    <div class="panel">
-      ${state.members.map(m=>{
-        const hrs = state.tasks.filter(t=>t.assigneeId===m.id && t.status!=='done').reduce((a,t)=>a+t.hours,0);
-        const pct = Math.min(100, Math.round((hrs/m.capacity)*100));
-        const color = pct>95 ? 'var(--danger)' : pct>70 ? 'var(--amber)' : 'var(--teal)';
-        const activeTasks = state.tasks.filter(t=>t.assigneeId===m.id && t.status!=='done').length;
-        return `
-        <div class="workload-row">
-          <div>
-            <div class="wl-name">${m.name}</div>
-            <div class="wl-role">${m.role} · ${activeTasks} active</div>
-          </div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
-          <div class="wl-figure">${hrs}h / ${m.capacity}h</div>
-        </div>`;
-      }).join('')}
-    </div>
-  `;
-}
-
-/* ============================= PROJECTS ============================= */
-function renderProjects(){
-  const view = document.getElementById('view');
-  view.innerHTML = `
-    <div class="view-head">
-      <div><div class="view-title">Projects</div><div class="view-sub">${state.projects.length} ACTIVE</div></div>
-      <div class="view-actions"><button class="btn btn-primary" id="addProjBtn">+ New project</button></div>
-    </div>
-    <div class="proj-grid">
-      ${state.projects.map(p=>{
-        const tasks = state.tasks.filter(t=>t.projectId===p.id);
-        const done = tasks.filter(t=>t.status==='done').length;
-        return `
-        <div class="proj-card" style="--accent:${p.color}">
-          <div class="card-top-row">
-            <div class="proj-card-name">${escapeHTML(p.name)}</div>
-            <div class="card-actions">
-              <button class="icon-btn" data-edit-proj="${p.id}" title="Edit">✎</button>
-              <button class="icon-btn" data-del-proj="${p.id}" title="Delete">✕</button>
-            </div>
-          </div>
-          <div class="proj-color-row">
-            <span class="swatch-dot-sm" style="background:${p.color}"></span>
-            <span class="proj-color-hex">${p.color}</span>
-          </div>
-          <div class="proj-card-stat">${done}/${tasks.length} tickets done</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${tasks.length?Math.round(done/tasks.length*100):0}%; background:${p.color};"></div></div>
-        </div>`;
-      }).join('') || '<div class="empty">No projects yet</div>'}
-    </div>
-  `;
-  document.getElementById('addProjBtn').addEventListener('click', ()=>openProjectModal());
-  document.querySelectorAll('[data-edit-proj]').forEach(btn=>{
-    btn.addEventListener('click', ()=> openProjectModal(project(btn.dataset.editProj)));
-  });
-  document.querySelectorAll('[data-del-proj]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const p = project(btn.dataset.delProj);
-      if(!p) return;
-      const linked = state.tasks.filter(t=>t.projectId===p.id).length;
-      const msg = linked ? `Delete "${p.name}"? ${linked} ticket(s) will become unassigned from a project.` : `Delete "${p.name}"?`;
-      if(!window.confirm(msg)) return;
-      state.tasks.forEach(t=>{ if(t.projectId===p.id){ t.projectId=''; DB.update('tasks', { projectId:'' }, 'id', t.id); } });
-      state.projects = state.projects.filter(x=>x.id!==p.id);
-      DB.remove('projects', 'id', p.id);
-      renderNav(); renderTicker(); renderProjects();
-      toast('Project deleted');
-    });
-  });
-}
+/* Projects renderer moved to modules/renderers/projects.js */
 
 /* ============================= TEAM ============================= */
 function renderTeam(){
@@ -684,50 +296,8 @@ function renderBills(){
   document.getElementById('billFilterMember').addEventListener('change', drawBills);
   drawBills();
 
-  function drawBills(){
-    const fs = document.getElementById('billFilterStatus').value;
-    const fm = document.getElementById('billFilterMember').value;
-    const filtered = state.bills.filter(b => (!fs || b.status===fs) && (!fm || b.memberId===fm));
-    const list = document.getElementById('billList');
-    const empty = document.getElementById('billEmpty');
-    if(list){
-      list.innerHTML = filtered.map(b => billCardHTML(b)).join('');
-      empty.style.display = filtered.length ? 'none' : 'block';
-    }
-    document.querySelectorAll('[data-bill-toggle]').forEach(el=>{
-      el.addEventListener('click', function(){
-        const card = this.closest('.invoice-card');
-        card.classList.toggle('expanded');
-      });
-    });
-    document.querySelectorAll('[data-bill-edit]').forEach(btn=>{
-      btn.addEventListener('click', e=>{ e.stopPropagation(); openBillModal(state.bills.find(b=>b.id===btn.dataset.billEdit)); });
-    });
-    document.querySelectorAll('[data-bill-del]').forEach(btn=>{
-      btn.addEventListener('click', e=>{
-        e.stopPropagation();
-        const b = state.bills.find(x=>x.id===btn.dataset.billDel);
-        if(!b || !window.confirm(`Delete ${b.billNumber}?`)) return;
-        state.bills = state.bills.filter(x=>x.id!==b.id);
-        DB.remove('bills', 'id', b.id);
-        renderNav(); renderTicker(); renderBills();
-        toast('Invoice deleted');
-      });
-    });
-    document.querySelectorAll('[data-bill-status]').forEach(btn=>{
-      btn.addEventListener('click', e=>{
-        e.stopPropagation();
-        const b = state.bills.find(x=>x.id===btn.dataset.billStatus);
-        if(!b) return;
-        const next = {draft:'sent', sent:'paid', paid:'paid', overdue:'paid'}[b.status] || 'paid';
-        b.status = next;
-        DB.update('bills', { status: b.status }, 'id', b.id);
-        renderNav(); renderTicker(); drawBills();
-        toast(`Invoice marked as ${next}`);
-      });
-    });
-  }
-}
+  /* Bills renderer moved to modules/renderers/bills.js */
+
 
 function billCardHTML(b){
   const m = billMember(b);
@@ -950,50 +520,7 @@ function openBillModal(existing){
 }
 
 /* ============================= AGREEMENTS ============================= */
-function renderAgreements(){
-  const view = document.getElementById('view');
-  view.innerHTML = `
-    <div class="view-head">
-      <div>
-        <div class="view-title">Agreements</div>
-        <div class="view-sub">VERBAL DEALS &amp; BILLING TERMS — MANUAL, KEPT VISIBLE HERE</div>
-      </div>
-      <div class="view-actions"><button class="btn btn-primary" id="addAgrBtn">+ Log an agreement</button></div>
-    </div>
-    <div class="agr-list" id="agrList">
-      ${state.agreements.length ? state.agreements.map(agreementHTML).join('') : '<div class="empty">No agreements logged yet — add the terms you\'ve verbally agreed on so they stay visible to everyone.</div>'}
-    </div>
-  `;
-  document.getElementById('addAgrBtn').addEventListener('click', openAgreementModal);
-document.querySelectorAll('[data-agr-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.agreements = state.agreements.filter(a=>a.id!==btn.dataset.agrDel);
-      DB.remove('agreements', 'id', btn.dataset.agrDel);
-      renderNav(); renderAgreements();
-      toast('Agreement removed');
-    });
-  });
-}
-
-function agreementHTML(a){
-  return `
-    <div class="agr-card">
-      <div class="agr-head">
-        <div>
-          <div class="agr-title">${escapeHTML(a.title)}</div>
-          <div class="agr-party">${escapeHTML(a.party)}</div>
-        </div>
-        <div class="agr-badges">
-          <span class="agr-amount">${escapeHTML(a.amount || '')}</span>
-          <span class="status-pill ${a.status}">${a.status}</span>
-        </div>
-      </div>
-      <div class="agr-terms">${escapeHTML(a.terms)}</div>
-      <div class="agr-foot">
-        <span class="agr-date">Agreed ${fmtDate(a.dateAgreed)}</span>
-        <button class="agr-del" data-agr-del="${a.id}">Remove</button>
-      </div>
-    </div>`;
+/* Agreements renderer moved to modules/renderers/agreements.js */
 }
 
 function openAgreementModal(){
@@ -1033,13 +560,8 @@ function openAgreementModal(){
   });
 }
 
-/* ============================= MODALS ============================= */
-function openModal(html){
-  document.getElementById('modalBody').innerHTML = html;
-  document.getElementById('modalBackdrop').classList.add('open');
-}
-function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
-document.getElementById('modalBackdrop').addEventListener('click', e=>{ if(e.target.id==='modalBackdrop') closeModal(); });
+/* ============================= MODALS (lazy-loaded) ============================= */
+// `openModal` and `closeModal` are provided by modules/modals.js and loaded at startup.
 
 function openTaskModal(){
   const projOptions = state.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
@@ -1162,17 +684,17 @@ function openProjectModal(existing){
 // openCardModal moved to modules/card-modal.js to keep main.js small
 
 /* ============================= RENDER DISPATCH ============================= */
-function render(){
+async function render(){
   try{
     renderNav();
     renderTicker();
-    if(state.view==='dashboard') renderDashboard();
-    else if(state.view==='kanban') renderKanban();
-    else if(state.view==='workload') renderWorkload();
-    else if(state.view==='projects') renderProjects();
-    else if(state.view==='team') renderTeam();
-    else if(state.view==='bills') renderBills();
-    else if(state.view==='agreements') renderAgreements();
+    if(state.view==='dashboard') await import('./modules/renderers/dashboard.js').then(m=>m.renderDashboard());
+    else if(state.view==='kanban') await import('./modules/renderers/kanban.js').then(m=>m.renderKanban());
+    else if(state.view==='workload') await import('./modules/renderers/workload.js').then(m=>m.renderWorkload());
+    else if(state.view==='projects') await import('./modules/renderers/projects.js').then(m=>m.renderProjects());
+    else if(state.view==='team') await import('./modules/renderers/team.js').then(m=>m.renderTeam());
+    else if(state.view==='bills') await import('./modules/renderers/bills.js').then(m=>m.renderBills());
+    else if(state.view==='agreements') await import('./modules/renderers/agreements.js').then(m=>m.renderAgreements());
   }catch(err){
     console.error('Render error:', err);
     const view = document.getElementById('view');
@@ -1341,177 +863,7 @@ function drawTable(ctx, headers, rows, widths, opts = {}){
   ctx.y -= 12;
 }
 
-/* -- Section renderers -- */
-function pdfDashboard(ctx){
-  ctx.header('Dashboard', 'SNAPSHOT — ' + new Date().toDateString().toUpperCase());
-
-  const total = state.tasks.length;
-  const doneCount = state.tasks.filter(t => t.status === 'done').length;
-  const inProgress = state.tasks.filter(t => t.status === 'progress').length;
-  const overdue = state.tasks.filter(isOverdue).length;
-  const totalBilled = state.bills.reduce((s, b) => s + calcBillTotal(b), 0);
-  const paidBilled = state.bills.filter(b => b.status === 'paid').reduce((s, b) => s + calcBillTotal(b), 0);
-  const outstanding = state.bills.filter(b => b.status === 'sent' || b.status === 'overdue').reduce((s, b) => s + calcBillTotal(b), 0);
-
-  ctx.sectionTitle('Ticker');
-  drawTable(ctx,
-    ['Metric', 'Value'],
-    [
-      ['Active tasks', String(total - doneCount)],
-      ['In progress', String(inProgress)],
-      ['Overdue tasks', String(overdue)],
-      ['Completed', String(doneCount)],
-      ['Billed', formatCurrency(totalBilled)],
-      ['Paid', formatCurrency(paidBilled)],
-      ['Outstanding', formatCurrency(outstanding)],
-    ],
-    [3, 1]);
-
-  ctx.sectionTitle('Tasks by status');
-  drawTable(ctx,
-    ['Status', 'Count'],
-    STATUS_COLS.map(s => [s.label, String(state.tasks.filter(t => t.status === s.key).length)]),
-    [3, 1]);
-
-  ctx.sectionTitle('Workload by teammate');
-  drawTable(ctx,
-    ['Teammate', 'Role', 'Active hrs', 'Capacity'],
-    state.members.map(m => [
-      m.name, m.role,
-      String(state.tasks.filter(t => t.assigneeId === m.id && t.status !== 'done').reduce((a, t) => a + t.hours, 0)),
-      String(m.capacity) + 'h',
-    ]),
-    [2, 2.4, 1.1, 1]);
-
-  ctx.sectionTitle('Project progress');
-  drawTable(ctx,
-    ['Project', 'Done', 'Total', '% Complete'],
-    state.projects.map(p => {
-      const tasks = state.tasks.filter(t => t.projectId === p.id);
-      const done = tasks.filter(t => t.status === 'done').length;
-      return [p.name, String(done), String(tasks.length), tasks.length ? Math.round(done / tasks.length * 100) + '%' : '0%'];
-    }),
-    [3, 1, 1, 1.2]);
-}
-
-function pdfKanban(ctx){
-  ctx.header('Kanban', 'TICKETS GROUPED BY STATUS — ' + state.tasks.length + ' TOTAL');
-  STATUS_COLS.forEach(col => {
-    const tasks = state.tasks.filter(t => t.status === col.key);
-    if(!tasks.length) return;
-    ctx.sectionTitle(col.label + '  (' + tasks.length + ')');
-    tasks.forEach(t => {
-      ctx.ensureSpace(38);
-      const cb = ctx.form.createCheckBox('chk_' + t.id);
-      cb.addToPage(ctx.page, { x: MARGIN, y: ctx.y - 9, width: 11, height: 11, borderColor: ctx.colors.dim, borderWidth: 1 });
-      if(t.status === 'done') cb.check();
-      const m = member(t.assigneeId), p = project(t.projectId);
-      ctx.page.drawText(t.id, { x: MARGIN + 16, y: ctx.y, size: 8.5, font: ctx.font, color: ctx.colors.dim });
-      ctx.page.drawText(sanitizePdfText(t.title), { x: MARGIN + 66, y: ctx.y, size: 10, font: ctx.fontBold, color: ctx.colors.dark });
-      ctx.y -= 12;
-      ctx.page.drawText(
-        sanitizePdfText((p ? p.name : '—') + '  ·  ' + (m ? m.name : 'Unassigned') + '  ·  due ' + t.due + '  ·  ' + t.priority),
-        { x: MARGIN + 66, y: ctx.y, size: 8, font: ctx.font, color: ctx.colors.faint });
-      ctx.y -= 24;
-    });
-  });
-}
-
-function pdfWorkload(ctx){
-  ctx.header('Workload', 'ACTIVE HOURS VS WEEKLY CAPACITY');
-  drawTable(ctx,
-    ['Teammate', 'Role', 'Active hrs', 'Capacity', 'Utilization'],
-    state.members.map(m => {
-      const hrs = state.tasks.filter(t => t.assigneeId === m.id && t.status !== 'done').reduce((a, t) => a + t.hours, 0);
-      const pct = Math.round((hrs / m.capacity) * 100);
-      return [m.name, m.role, String(hrs) + 'h', String(m.capacity) + 'h', pct + '%'];
-    }),
-    [1.8, 2.2, 1, 1, 1]);
-}
-
-function pdfProjects(ctx){
-  ctx.header('Projects', state.projects.length + ' ACTIVE');
-  drawTable(ctx,
-    ['Project', 'Accent', 'Done', 'Total', '% Complete'],
-    state.projects.map(p => {
-      const tasks = state.tasks.filter(t => t.projectId === p.id);
-      const done = tasks.filter(t => t.status === 'done').length;
-      return [p.name, p.color, String(done), String(tasks.length), tasks.length ? Math.round(done / tasks.length * 100) + '%' : '0%'];
-    }),
-    [2.4, 1.2, 0.8, 0.8, 1.2]);
-}
-
-function pdfTeam(ctx){
-  ctx.header('Team', state.members.length + ' MEMBERS');
-  drawTable(ctx,
-    ['Name', 'Role', 'Weekly capacity'],
-    state.members.map(m => [m.name, m.role, String(m.capacity) + 'h']),
-    [1.6, 2.2, 1.2]);
-}
-
-function pdfBills(ctx){
-  ctx.header('Bills & Invoices', state.bills.length + ' INVOICES');
-  const totalBilled = state.bills.reduce((s, b) => s + calcBillTotal(b), 0);
-  ctx.paragraph('Total billed: ' + formatCurrency(totalBilled));
-  ctx.y -= 4;
-  if(!state.bills.length){
-    ctx.paragraph('No invoices yet.', 9.5, ctx.colors.faint);
-    return;
-  }
-  state.bills.forEach(b => {
-    const m = billMember(b);
-    const sub = calcSubtotal(b.lineItems);
-    const tax = calcTax(sub, b.taxRate);
-    const total = sub + tax;
-    ctx.sectionTitle(b.billNumber + ' — ' + (m ? m.name : 'Unassigned') + '  ·  ' + b.status);
-    ctx.paragraph('Period: ' + b.periodStart + ' → ' + b.periodEnd + '   |   Issued: ' + b.issueDate + '   |   Due: ' + b.dueDate, 8.5, ctx.colors.faint, 11);
-    if(b.flags && b.flags.length){
-      // Draw small colored markers for each flag with label
-      ctx.ensureSpace(18);
-      let fx = MARGIN;
-      const flagToColor = (f) => {
-        const key = normalizeFlag(f);
-        if(key==='urgent') return ctx.colors.flagUrgent;
-        if(key==='reviewed') return ctx.colors.flagReviewed;
-        if(key==='recurring') return ctx.colors.flagRecurring;
-        if(key==='tax-exempt') return ctx.colors.flagTaxExempt;
-        if(key==='final') return ctx.colors.flagFinal;
-        return ctx.colors.dim;
-      };
-      for(const f of b.flags){
-        const col = flagToColor(f);
-        ctx.page.drawRectangle({ x: fx, y: ctx.y - 12, width: 10, height: 10, color: col });
-        ctx.page.drawText(sanitizePdfText(getFlagLabel(f)), { x: fx + 14, y: ctx.y - 2, size: 9, font: ctx.font, color: ctx.colors.faint });
-        fx += 84;
-      }
-      ctx.y -= 18;
-    }
-    drawTable(ctx,
-      ['Description', 'Hours', 'Rate', 'Amount'],
-      b.lineItems.map(li => [li.description, String(li.hours), formatCurrency(li.rate) + '/hr', formatCurrency(li.hours * li.rate)]),
-      [2.4, 0.7, 0.9, 1]);
-    ctx.paragraph('Subtotal: ' + formatCurrency(sub) + '   |   Tax (' + b.taxRate + '%): ' + formatCurrency(tax) + '   |   Total: ' + formatCurrency(total), 9, ctx.colors.dark);
-    if(b.notes) ctx.paragraph('Notes: ' + b.notes, 8.5, ctx.colors.faint, 11);
-    ctx.y -= 8;
-  });
-}
-
-function pdfAgreements(ctx){
-  ctx.header('Agreements', 'VERBAL DEALS & BILLING TERMS');
-  if(!state.agreements.length){
-    ctx.paragraph('No agreements logged yet.', 9.5, ctx.colors.faint);
-    return;
-  }
-  state.agreements.forEach(a => {
-    ctx.ensureSpace(60);
-    ctx.sectionTitle(a.title);
-    ctx.paragraph(
-      (a.party || '') + (a.amount ? '  ·  ' + a.amount : '') + '  ·  ' + a.status + '  ·  agreed ' + a.dateAgreed,
-      8.5, ctx.colors.faint, 11);
-    ctx.paragraph(a.terms || '', 9.5, ctx.colors.body);
-    ctx.y -= 6;
-  });
-}
+/* -- PDF section renderers moved to modules/pdf-sections.js -- */
 
 /* -- Export modal -- */
 function openExportModal(){
@@ -1562,5 +914,12 @@ document.getElementById('exportBtn').addEventListener('click', openExportModal);
 /* ============================= INIT ============================= */
 DB.onReady(() => {
   DB.restoreState(state);
-  render();
+  const waits = [];
+  if(window._helpersReady) waits.push(window._helpersReady);
+  if(window._modalsReady) waits.push(window._modalsReady);
+  if(waits.length){
+    Promise.all(waits).then(()=>render()).catch(err=>{ console.error('Module load failed before render:', err); render(); });
+  } else {
+    render();
+  }
 });

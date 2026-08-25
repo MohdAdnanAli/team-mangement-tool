@@ -1,3 +1,4 @@
+import * as sections from './pdf-sections.js';
 export async function buildExportPDF(selected){
   const PDFLib = window.PDFLib;
   if(!PDFLib) throw new Error('PDFLib not available');
@@ -8,8 +9,7 @@ export async function buildExportPDF(selected){
   const form = pdfDoc.getForm();
 
   const rgbFn = (typeof rgb === 'function')
-    ? rgb
-    : (r, g, b) => ({ r, g, b });
+    ? rgb : (r,g,b)=>({r,g,b});
 
   const colors = {
     dark:  rgbFn(0.08, 0.08, 0.1),
@@ -29,14 +29,13 @@ export async function buildExportPDF(selected){
 
   const ctx = window.makePdfCtx(pdfDoc, font, fontBold, form, colors);
 
-  // Call the section renderers which are defined in main.js and available on window
-  if(selected.includes('dashboard')) window.pdfDashboard && window.pdfDashboard(ctx);
-  if(selected.includes('kanban')) window.pdfKanban && window.pdfKanban(ctx);
-  if(selected.includes('workload')) window.pdfWorkload && window.pdfWorkload(ctx);
-  if(selected.includes('projects')) window.pdfProjects && window.pdfProjects(ctx);
-  if(selected.includes('team')) window.pdfTeam && window.pdfTeam(ctx);
-  if(selected.includes('bills')) window.pdfBills && window.pdfBills(ctx);
-  if(selected.includes('agreements')) window.pdfAgreements && window.pdfAgreements(ctx);
+  if(selected.includes('dashboard')) sections.pdfDashboard(ctx);
+  if(selected.includes('kanban')) sections.pdfKanban(ctx);
+  if(selected.includes('workload')) sections.pdfWorkload(ctx);
+  if(selected.includes('projects')) sections.pdfProjects(ctx);
+  if(selected.includes('team')) sections.pdfTeam(ctx);
+  if(selected.includes('bills')) sections.pdfBills(ctx);
+  if(selected.includes('agreements')) sections.pdfAgreements(ctx);
 
   if(!ctx.page) ctx.header('Ops Console', 'No sections were selected for export.');
 
