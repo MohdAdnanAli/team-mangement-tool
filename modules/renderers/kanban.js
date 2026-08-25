@@ -19,7 +19,8 @@ export function renderKanban(){
     <div class="kanban-board" id="kanbanBoard"></div>
   `;
 
-  document.getElementById('addTaskBtn').addEventListener('click', window.openTaskModal);
+  function _safeOpen(name, evtName, arg){ if(typeof window[name] === 'function'){ try{ if(arg!==undefined) window[name](arg); else window[name](); }catch(e){ console.error(e); }} else { window.dispatchEvent(new CustomEvent(evtName, { detail: arg })); } }
+  document.getElementById('addTaskBtn').addEventListener('click', ()=>_safeOpen('openTaskModal','open-task-modal'));
   document.getElementById('filterProject').addEventListener('change', drawBoard);
   document.getElementById('filterMember').addEventListener('change', drawBoard);
 

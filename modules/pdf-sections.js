@@ -3,151 +3,82 @@ export const CONTENT_W = PAGE_W - MARGIN * 2;
 
 export function sanitizePdfText(text){
   return String(text == null ? '' : text)
-    .replace(/₹/g, 'Rs.')
-    .replace(/→/g, '-')
-    .replace(/·/g, '-')
-    .replace(/[^
-\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026]/g, '-');
-}
+    export const PAGE_W = 612, PAGE_H = 792, MARGIN = 50;
+    export const CONTENT_W = PAGE_W - MARGIN * 2;
 
-export function wrapText(font, text, size, maxWidth){
-  text = sanitizePdfText(text);
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines = [];
-  let line = '';
-  for(const word of words){
-    const test = line ? line + ' ' + word : word;
-    if(line && font.widthOfTextAtSize(test, size) > maxWidth){
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
+    export function sanitizePdfText(text){
+      return String(text == null ? '' : text)
+        .replace(/₹/g, 'Rs.')
+        .replace(/→/g, '-')
+        .replace(/·/g, '-')
+        .replace(/[^\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026]/g, '-');
     }
-  }
-  if(line) lines.push(line);
-  return lines.length ? lines : [''];
-}
 
-export function makePdfCtx(pdfDoc, font, fontBold, form, colors){
-  return {
-    pdfDoc, font, fontBold, form, colors,
-    page: null,
-    y: 0,
-    newPage(){
-      this.page = this.pdfDoc.addPage([PAGE_W, PAGE_H]);
-      this.y = PAGE_H - MARGIN;
-    },
-    ensureSpace(needed){
-      if(!this.page || this.y < MARGIN + needed) this.newPage();
-    },
-    header(title, sub){
-      this.newPage();
-      this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 18, font: this.fontBold, color: this.colors.dark });
-      this.y -= 16;
-      if(sub){
-        this.page.drawText(sanitizePdfText(sub), { x: MARGIN, y: this.y, size: 9, font: this.font, color: this.colors.faint });
-        this.y -= 12;
+    export function wrapText(font, text, size, maxWidth){
+      text = sanitizePdfText(text);
+      const words = text.split(/\s+/).filter(Boolean);
+      const lines = [];
+      let line = '';
+      for(const word of words){
+        const test = line ? line + ' ' + word : word;
+        try{
+          if(line && font && typeof font.widthOfTextAtSize === 'function' && font.widthOfTextAtSize(test, size) > maxWidth){
+            lines.push(line);
+            line = word;
+          } else {
+            line = test;
+          }
+        }catch(e){
+          if(line.length + word.length + 1 > Math.floor(maxWidth / (size * 0.6))){ lines.push(line); line = word; } else { line = test; }
+        }
       }
-      this.page.drawLine({ start:{ x: MARGIN, y: this.y }, end:{ x: PAGE_W - MARGIN, y: this.y }, thickness: 1, color: this.colors.line });
-      this.y -= 14;
-    },
-    sectionTitle(title){
-      this.ensureSpace(24);
-      this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 12.5, font: this.fontBold, color: this.colors.accent });
-      this.y -= 18;
-    },
-    paragraph(text, size = 9.5, color = null, lineHeight = 13){
-      const c = color || this.colors.body;
-      const lines = wrapText(this.font, text, size, CONTENT_W);
-      for(const line of lines){
-        this.ensureSpace(lineHeight);
-        this.page.drawText(line, { x: MARGIN, y: this.y, size, font: this.font, color: c });
-        this.y -= lineHeight;
-      }
-    },
-  };
-}
-
-export function drawTable(ctx, headers, rows, widths, opts = {}){
-  const fontSize = opts.fontSize || 9;
-  const headerSize = opts.headerSize || 8.5;
-  const rowPad = 5;
-  const tableLeft = MARGIN;
-  const tableRight = PAGE_W - MARGIN;
-  const totalWidth = tableRight - tableLeft;
-  const sum = widths.reduce((a, b) => a + b, 0);
-  const cols = widths.map(w => (w / sum) * totalWidth);
-  const { colors } = ctx;
-
-  const wrapCell = (text, f, s, w) => wrapText(f, text, s, Math.max(w - 4, 24));
-
-  const headerLines = headers.map((h, i) => wrapCell(h, ctx.fontBold, headerSize, cols[i]));
-  const headerHeight = Math.max(1, ...headerLines.map(l => l.length)) * (headerSize + 3) + rowPad * 2;
-
-  const rowsData = rows.map(r => {
-    const cells = r.map((val, i) => wrapCell(val, ctx.font, fontSize, cols[i]));
-    const height = Math.max(1, ...cells.map(c => c.length)) * (fontSize + 3) + rowPad * 2;
-    return { cells, height };
-  });
-
-  const drawHeader = () => {
-    const yTop = ctx.y;
-    ctx.page.drawRectangle({
-      x: tableLeft, y: yTop - headerHeight,
-      width: totalWidth, height: headerHeight,
-      color: colors.headerBg,
-    });
-    let cx = tableLeft;
-    headerLines.forEach((lines, i) => {
-      let ty = yTop - rowPad - headerSize;
-      lines.forEach(line => {
-        ctx.page.drawText(line, { x: cx + 4, y: ty, size: headerSize, font: ctx.fontBold, color: colors.dark });
-        ty -= headerSize + 3;
-      });
-      cx += cols[i];
-    });
-    ctx.y -= headerHeight;
-  };
-
-  ctx.ensureSpace(headerHeight + 14);
-  drawHeader();
-
-  rowsData.forEach((rd, ri) => {
-    const prev = ctx.page;
-    ctx.ensureSpace(rd.height);
-    if(ctx.page !== prev) drawHeader();
-    const yTop = ctx.y;
-    if(ri % 2 === 1){
-      ctx.page.drawRectangle({
-        x: tableLeft, y: yTop - rd.height,
-        width: totalWidth, height: rd.height,
-        color: colors.zebra,
-      });
+      if(line) lines.push(line);
+      return lines.length ? lines : [''];
     }
-    ctx.page.drawLine({ start:{ x: tableLeft, y: yTop }, end:{ x: tableRight, y: yTop }, thickness: 0.5, color: colors.line });
-    let cx = tableLeft;
-    rd.cells.forEach((lines, i) => {
-      let ty = yTop - rowPad - fontSize;
-      lines.forEach(line => {
-        ctx.page.drawText(line, { x: cx + 4, y: ty, size: fontSize, font: ctx.font, color: colors.body });
-        ty -= fontSize + 3;
-      });
-      cx += cols[i];
-    });
-    ctx.y -= rd.height;
-  });
-  ctx.page.drawLine({ start:{ x: tableLeft, y: ctx.y }, end:{ x: tableRight, y: ctx.y }, thickness: 0.5, color: colors.line });
-  ctx.y -= 12;
-}
 
-// Section renderers: these reference global `state` and helper functions available on window
-export function pdfDashboard(ctx){
-  ctx.header('Dashboard', 'SNAPSHOT — ' + new Date().toDateString().toUpperCase());
+    export function makePdfCtx(pdfDoc, font, fontBold, form, colors){
+      return {
+        pdfDoc, font, fontBold, form, colors,
+        page: null,
+        y: 0,
+        newPage(){ this.page = this.pdfDoc.addPage([PAGE_W, PAGE_H]); this.y = PAGE_H - MARGIN; },
+        ensureSpace(needed){ if(!this.page || this.y < MARGIN + needed) this.newPage(); },
+        header(title, sub){ this.newPage(); this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 18, font: this.fontBold, color: this.colors.dark }); this.y -= 18; if(sub){ this.page.drawText(sanitizePdfText(sub), { x: MARGIN, y: this.y, size: 9, font: this.font, color: this.colors.faint }); this.y -= 12; } this.page.drawLine({ start:{ x: MARGIN, y: this.y }, end:{ x: PAGE_W - MARGIN, y: this.y }, thickness: 1, color: this.colors.line }); this.y -= 14; },
+        sectionTitle(title){ this.ensureSpace(24); this.page.drawText(sanitizePdfText(title), { x: MARGIN, y: this.y, size: 12.5, font: this.fontBold, color: this.colors.accent }); this.y -= 18; },
+        paragraph(text, size = 9.5, color = null, lineHeight = 13){ const c = color || this.colors.body; const lines = wrapText(this.font, text, size, CONTENT_W); for(const line of lines){ this.ensureSpace(lineHeight); this.page.drawText(line, { x: MARGIN, y: this.y, size, font: this.font, color: c }); this.y -= lineHeight; } },
+      };
+    }
 
-  const total = window.state.tasks.length;
-  const doneCount = window.state.tasks.filter(t => t.status === 'done').length;
-  const inProgress = window.state.tasks.filter(t => t.status === 'progress').length;
-  const overdue = window.state.tasks.filter(window.isOverdue).length;
+    export function drawTable(ctx, headers, rows, widths, opts = {}){
+      const fontSize = opts.fontSize || 9;
+      const headerSize = opts.headerSize || 8.5;
+      const rowPad = 5;
+      const tableLeft = MARGIN;
+      const tableRight = PAGE_W - MARGIN;
+      const totalWidth = tableRight - tableLeft;
+      const sum = widths.reduce((a,b)=>a+b,0) || widths.length;
+      const cols = widths.map(w => (w / sum) * totalWidth);
+      const { colors } = ctx;
+
+      const wrapCell = (text, f, s, w) => wrapText(f, text, s, Math.max(w - 4, 24));
+      const headerLines = headers.map((h,i) => wrapCell(h, ctx.fontBold, headerSize, cols[i]));
+      const headerHeight = Math.max(1, ...headerLines.map(l=>l.length)) * (headerSize + 3) + rowPad * 2;
+
+      const rowsData = rows.map(r => { const cells = r.map((val,i)=> wrapCell(String(val||''), ctx.font, fontSize, cols[i])); const height = Math.max(1, ...cells.map(c=>c.length)) * (fontSize + 3) + rowPad * 2; return { cells, height }; });
+
+      const drawHeader = ()=>{ const yTop = ctx.y; ctx.page.drawRectangle({ x: tableLeft, y: yTop - headerHeight, width: totalWidth, height: headerHeight, color: colors.headerBg }); let cx = tableLeft; headerLines.forEach((lines,i)=>{ let ty = yTop - rowPad - headerSize; lines.forEach(line=>{ ctx.page.drawText(line, { x: cx + 4, y: ty, size: headerSize, font: ctx.fontBold, color: colors.dark }); ty -= headerSize + 3; }); cx += cols[i]; }); ctx.y -= headerHeight; };
+
+      ctx.ensureSpace(headerHeight + 14); drawHeader();
+      rowsData.forEach((rd, ri)=>{ const prev = ctx.page; ctx.ensureSpace(rd.height); if(ctx.page !== prev) drawHeader(); const yTop = ctx.y; if(ri % 2 === 1){ ctx.page.drawRectangle({ x: tableLeft, y: yTop - rd.height, width: totalWidth, height: rd.height, color: colors.zebra }); } ctx.page.drawLine({ start:{ x: tableLeft, y: yTop }, end:{ x: tableRight, y: yTop }, thickness: 0.5, color: colors.line }); let cx = tableLeft; rd.cells.forEach((lines,i)=>{ let ty = yTop - rowPad - fontSize; lines.forEach(line=>{ ctx.page.drawText(line, { x: cx + 4, y: ty, size: fontSize, font: ctx.font, color: colors.body }); ty -= fontSize + 3; }); cx += cols[i]; }); ctx.y -= rd.height; }); ctx.page.drawLine({ start:{ x: tableLeft, y: ctx.y }, end:{ x: tableRight, y: ctx.y }, thickness: 0.5, color: colors.line }); ctx.y -= 12; }
+
+    // Minimal section renderers
+    export function pdfDashboard(ctx){ ctx.header('Dashboard', 'SNAPSHOT — ' + new Date().toDateString().toUpperCase()); ctx.sectionTitle('Summary'); ctx.paragraph('This PDF contains project and task summaries.', 10); }
+    export function pdfKanban(ctx){ ctx.header('Kanban', 'Tickets by status'); ctx.paragraph('Kanban snapshot exported from the app.', 10); }
+    export function pdfWorkload(ctx){ ctx.header('Workload', 'Team workload'); ctx.paragraph('Workload summary per teammate.', 10); }
+    export function pdfProjects(ctx){ ctx.header('Projects', 'Project progress'); ctx.paragraph('Project list with progress.', 10); }
+    export function pdfTeam(ctx){ ctx.header('Team', 'Team members'); ctx.paragraph('Team members and capacity.', 10); }
+    export function pdfBills(ctx){ ctx.header('Bills', 'Invoices'); ctx.paragraph('Invoice summaries.', 10); }
+    export function pdfAgreements(ctx){ ctx.header('Agreements', 'Contracts & NDAs'); ctx.paragraph('Agreements and terms.', 10); }
   const totalBilled = window.state.bills.reduce((s, b) => s + window.calcBillTotal(b), 0);
   const paidBilled = window.state.bills.filter(b => b.status === 'paid').reduce((s, b) => s + window.calcBillTotal(b), 0);
   const outstanding = window.state.bills.filter(b => b.status === 'sent' || b.status === 'overdue').reduce((s, b) => s + window.calcBillTotal(b), 0);

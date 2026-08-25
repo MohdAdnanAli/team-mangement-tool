@@ -28,9 +28,10 @@ export function renderProjects(){
       }).join('') || '<div class="empty">No projects yet</div>'}
     </div>
   `;
-  document.getElementById('addProjBtn').addEventListener('click', ()=>window.openProjectModal());
+  function _safeOpen(name, evtName, arg){ if(typeof window[name] === 'function'){ try{ if(arg!==undefined) window[name](arg); else window[name](); }catch(e){ console.error(e); }} else { window.dispatchEvent(new CustomEvent(evtName, { detail: arg })); } }
+  document.getElementById('addProjBtn').addEventListener('click', ()=>_safeOpen('openProjectModal','open-project-modal'));
   document.querySelectorAll('[data-edit-proj]').forEach(btn=>{
-    btn.addEventListener('click', ()=> window.openProjectModal(window.project(btn.dataset.editProj)));
+    btn.addEventListener('click', ()=> _safeOpen('openProjectModal','open-project-modal', window.project(btn.dataset.editProj)));
   });
   document.querySelectorAll('[data-del-proj]').forEach(btn=>{
     btn.addEventListener('click', ()=>{

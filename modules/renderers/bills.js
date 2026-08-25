@@ -35,7 +35,11 @@ export function renderBills(){
     <div id="billEmpty" class="bill-empty" style="${window.state.bills.length?'display:none':'display:block'}">No invoices yet — create one to start tracking billable work.</div>
   `;
 
-  document.getElementById('addBillBtn').addEventListener('click', ()=>window.openBillModal());
+  function _safeOpen(name, evtName, arg){
+    if(typeof window[name] === 'function'){ try{ if(arg!==undefined) window[name](arg); else window[name](); }catch(e){ console.error(e); }}
+    else { window.dispatchEvent(new CustomEvent(evtName, { detail: arg })); }
+  }
+  document.getElementById('addBillBtn').addEventListener('click', ()=>_safeOpen('openBillModal','open-bill-modal'));
   document.getElementById('billFilterStatus').addEventListener('change', drawBills);
   document.getElementById('billFilterMember').addEventListener('change', drawBills);
   drawBills();
@@ -57,7 +61,7 @@ export function renderBills(){
       });
     });
     document.querySelectorAll('[data-bill-edit]').forEach(btn=>{
-      btn.addEventListener('click', e=>{ e.stopPropagation(); window.openBillModal(window.state.bills.find(b=>b.id===btn.dataset.billEdit)); });
+      btn.addEventListener('click', e=>{ e.stopPropagation(); _safeOpen('openBillModal','open-bill-modal', window.state.bills.find(b=>b.id===btn.dataset.billEdit)); });
     });
     document.querySelectorAll('[data-bill-del]').forEach(btn=>{
       btn.addEventListener('click', e=>{

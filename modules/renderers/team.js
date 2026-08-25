@@ -23,10 +23,11 @@ export function renderTeam(){
         </div>`).join('') || '<div class="empty">No teammates yet</div>'}
     </div>
   `;
-  document.getElementById('addMemberBtn').addEventListener('click', ()=>window.openMemberModal());
-  document.querySelectorAll('[data-edit-mem]').forEach(btn=>{
-    btn.addEventListener('click', ()=> window.openMemberModal(window.member(btn.dataset.editMem)));
-  });
+    function _safeOpen(name, evtName, arg){ if(typeof window[name] === 'function'){ try{ if(arg!==undefined) window[name](arg); else window[name](); }catch(e){ console.error(e); }} else { window.dispatchEvent(new CustomEvent(evtName, { detail: arg })); } }
+    document.getElementById('addMemberBtn').addEventListener('click', ()=>_safeOpen('openMemberModal','open-member-modal'));
+    document.querySelectorAll('[data-edit-mem]').forEach(btn=>{
+      btn.addEventListener('click', ()=> _safeOpen('openMemberModal','open-member-modal', window.member(btn.dataset.editMem)));
+    });
   document.querySelectorAll('[data-del-mem]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const m = window.member(btn.dataset.delMem);

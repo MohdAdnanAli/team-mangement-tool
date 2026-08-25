@@ -690,6 +690,13 @@ try{
   if(typeof openAgreementModal === 'function') window.openAgreementModal = openAgreementModal; else console.warn('openAgreementModal not defined');
 }catch(e){ console.warn('Error exposing modal helpers:', e); }
 
+// Fallback listeners for renderer modules that dispatch events when globals are missing
+window.addEventListener('open-bill-modal', (ev)=>{ try{ if(typeof openBillModal==='function') openBillModal(ev.detail); }catch(e){ console.error('open-bill-modal handler failed', e); } });
+window.addEventListener('open-task-modal', (ev)=>{ try{ if(typeof openTaskModal==='function') openTaskModal(ev.detail); }catch(e){ console.error('open-task-modal handler failed', e); } });
+window.addEventListener('open-member-modal', (ev)=>{ try{ if(typeof openMemberModal==='function') openMemberModal(ev.detail); }catch(e){ console.error('open-member-modal handler failed', e); } });
+window.addEventListener('open-project-modal', (ev)=>{ try{ if(typeof openProjectModal==='function') openProjectModal(ev.detail); }catch(e){ console.error('open-project-modal handler failed', e); } });
+window.addEventListener('open-agreement-modal', (ev)=>{ try{ if(typeof openAgreementModal==='function') openAgreementModal(ev.detail); }catch(e){ console.error('open-agreement-modal handler failed', e); } });
+
 // openCardModal moved to modules/card-modal.js to keep main.js small
 
 /* ============================= RENDER DISPATCH ============================= */

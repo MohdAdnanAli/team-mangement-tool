@@ -28,7 +28,8 @@ export function renderDashboard(){
     </div>
   `;
 
-  document.getElementById('dashQuickAddBtn').addEventListener('click', window.openTaskModal);
+  function _safeOpen(name, evtName, arg){ if(typeof window[name] === 'function'){ try{ if(arg!==undefined) window[name](arg); else window[name](); }catch(e){ console.error(e); }} else { window.dispatchEvent(new CustomEvent(evtName, { detail: arg })); } }
+  document.getElementById('dashQuickAddBtn').addEventListener('click', ()=>_safeOpen('openTaskModal','open-task-modal'));
   document.getElementById('dashOpenBoard').addEventListener('click', ()=>{
     window.state.view = 'kanban';
     window.render();
