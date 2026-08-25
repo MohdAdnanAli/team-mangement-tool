@@ -121,6 +121,13 @@ const state = {
   ],
 };
 
+// Ensure seeded in-memory tasks have a `meta` field so UI code can safely parse it
+state.tasks.forEach(t=>{
+  if(t.meta === undefined){
+    t.meta = JSON.stringify({ description: '', labels: [], checklist: [], attachments: [], activity: [] });
+  }
+});
+
 const STATUS_COLS = [
   {key:'todo', label:'To Do'},
   {key:'progress', label:'In Progress'},
@@ -416,6 +423,7 @@ function renderKanban(){
       <div class="view-actions">
         <select class="filter" id="filterProject"><option value="">All projects</option>${projOptions}</select>
         <select class="filter" id="filterMember"><option value="">All teammates</option>${memberOptions}</select>
+        <select class="filter" id="filterLabel"><option value="">All labels</option></select>
         <button class="btn btn-primary" id="addTaskBtn">+ New ticket</button>
       </div>
     </div>
@@ -429,10 +437,18 @@ function renderKanban(){
   function drawBoard(){
     const fp = document.getElementById('filterProject').value;
     const fm = document.getElementById('filterMember').value;
+    const fl = document.getElementById('filterLabel') ? document.getElementById('filterLabel').value : '';
     const filtered = state.tasks.filter(t => (!fp || t.projectId===fp) && (!fm || t.assigneeId===fm));
+    const filteredByLabel = filtered.filter(t => {
+      if(!fl) return true;
+      try{
+        const meta = typeof t.meta === 'string' ? JSON.parse(t.meta) : (t.meta || {});
+        return Array.isArray(meta.labels) && meta.labels.includes(fl);
+      }catch(e){ return false; }
+    });
     const board = document.getElementById('kanbanBoard');
     board.innerHTML = STATUS_COLS.map(col=>{
-      const tasks = filtered.filter(t=>t.status===col.key);
+      const tasks = filteredByLabel.filter(t=>t.status===col.key);
       return `
         <div class="kanban-col" data-col="${col.key}">
           <div class="kanban-col-head"><span>${col.label}</span><span>${tasks.length}</span></div>
@@ -445,10 +461,29 @@ function renderKanban(){
   }
   drawBoard();
 
+  // populate label filter with known labels
+  updateLabelFilter();
+
+
+// Populate the label filter dropdown from current tasks
+function updateLabelFilter(){
+  const labelSelect = document.getElementById('filterLabel');
+  if(!labelSelect) return;
+  // clear existing except the first option
+  while(labelSelect.options.length>1) labelSelect.remove(1);
+  const allLabels = new Set();
+  state.tasks.forEach(t=>{
+    try{ const meta = typeof t.meta === 'string' ? JSON.parse(t.meta) : (t.meta||{}); if(meta.labels && Array.isArray(meta.labels)) meta.labels.forEach(l=>allLabels.add(l)); }catch(e){}
+  });
+  Array.from(allLabels).forEach(l=>{ const opt = document.createElement('option'); opt.value = l; opt.textContent = l; labelSelect.appendChild(opt); });
+  labelSelect.onchange = () => render();
+}
   function ticketHTML(t){
     const m = member(t.assigneeId);
     const p = project(t.projectId);
     const overdue = isOverdue(t);
+    const labels = (t.meta && t.meta.labels) ? (Array.isArray(t.meta.labels) ? t.meta.labels : (typeof t.meta === 'string' ? (JSON.parse(t.meta).labels||[]) : [])) : [];
+    const labelsHTML = labels.length ? labels.map(l=>`<span class="label-pill" style="background:${l}"></span>`).join('') : '';
     return `
       <div class="ticket" draggable="true" data-task="${t.id}">
         <div class="ticket-meta">
@@ -456,6 +491,7 @@ function renderKanban(){
           <button class="ticket-del" data-del="${t.id}" title="Delete">✕</button>
         </div>
         <div class="ticket-title">${escapeHTML(t.title)}</div>
+        <div style="margin-top:6px">${labelsHTML}</div>
         <div class="ticket-meta">
           <span class="tag prio-${t.priority}">${t.priority}</span>
           <span class="avatar" title="${m?m.name:'Unassigned'}">${m?initials(m.name):'—'}</span>
@@ -474,6 +510,7 @@ function renderKanban(){
         el.classList.add('dragging');
       });
       el.addEventListener('dragend', ()=> el.classList.remove('dragging'));
+      el.addEventListener('click', ()=> openCardModal(el.dataset.task));
     });
     document.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', e=>{
@@ -1061,6 +1098,7 @@ function openTaskModal(){
       priority: document.getElementById('fPriority').value,
       due: document.getElementById('fDue').value || addDaysStr(7),
       hours: Number(document.getElementById('fHours').value) || 4,
+        meta: JSON.stringify({ description: '', labels: [], checklist: [], attachments: [], activity: [] })
     };
     state.tasks.push(task);
     DB.insert('tasks', task);
@@ -1144,6 +1182,8 @@ function openProjectModal(existing){
     closeModal(); renderNav(); renderTicker(); renderProjects();
   });
 }
+
+// openCardModal moved to modules/card-modal.js to keep main.js small
 
 /* ============================= RENDER DISPATCH ============================= */
 function render(){

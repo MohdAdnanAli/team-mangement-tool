@@ -99,6 +99,7 @@ const DB = (() => {
       status TEXT NOT NULL DEFAULT 'todo',
       priority TEXT NOT NULL DEFAULT 'med',
       due TEXT NOT NULL DEFAULT '',
+      meta TEXT DEFAULT '',
       hours INTEGER NOT NULL DEFAULT 4
     );
 
@@ -235,6 +236,17 @@ const DB = (() => {
         }
       }catch(e){ console.warn('Migration check for bills.flags failed', e); }
 
+      // Migration: add `meta` column to tasks if it doesn't exist (for existing DBs)
+      try{
+        const pragmaTasks = db.exec("PRAGMA table_info('tasks')");
+        if(pragmaTasks && pragmaTasks.length && pragmaTasks[0].values){
+          const cols = pragmaTasks[0].values.map(v => v[1]);
+          if(!cols.includes('meta')){
+            db.run("ALTER TABLE tasks ADD COLUMN meta TEXT DEFAULT ''");
+          }
+        }
+      }catch(e){ console.warn('Migration check for tasks.meta failed', e); }
+
       // Seed if empty
       seedDefaults();
       seedAgreements();
@@ -340,6 +352,18 @@ const DB = (() => {
     state.members = queryAll('SELECT * FROM members ORDER BY id');
     state.projects = queryAll('SELECT * FROM projects ORDER BY id');
     state.tasks = queryAll('SELECT * FROM tasks ORDER BY id');
+    // Ensure `meta` is parsed into an object for each task
+    state.tasks.forEach(t => {
+      try{
+        t.meta = t.meta ? JSON.parse(t.meta) : {};
+      }catch(e){ t.meta = {}; }
+      // Normalize expected meta fields
+      t.meta.description = t.meta.description || '';
+      t.meta.labels = Array.isArray(t.meta.labels) ? t.meta.labels : [];
+      t.meta.checklist = Array.isArray(t.meta.checklist) ? t.meta.checklist : [];
+      t.meta.attachments = Array.isArray(t.meta.attachments) ? t.meta.attachments : [];
+      t.meta.activity = Array.isArray(t.meta.activity) ? t.meta.activity : [];
+    });
     state.bills = queryAll('SELECT * FROM bills ORDER BY id');
     state.agreements = queryAll('SELECT * FROM agreements ORDER BY id');
 
