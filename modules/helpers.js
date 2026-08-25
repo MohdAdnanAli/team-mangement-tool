@@ -1,6 +1,7 @@
 export function member(id){ return window.state.members.find(m=>m.id===id); }
 export function project(id){ return window.state.projects.find(p=>p.id===id); }
 export function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+export function escapeHTML(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 export function todayUTC(){ const n = new Date(); return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())); }
 export function todayStr(){ return todayUTC().toISOString().slice(0,10); }
 export function addDaysStr(days){ const d = todayUTC(); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0,10); }

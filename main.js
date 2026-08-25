@@ -135,7 +135,7 @@ const STATUS_COLS = [
   {key:'done', label:'Done'},
 ];
 
-let charts = {};
+window.charts = {};
 
 // Expose shared runtime objects for lazy-loaded modules
 window.state = state;
@@ -681,6 +681,15 @@ function openProjectModal(existing){
   });
 }
 
+// Expose modal opener helpers globally so renderer modules can call them.
+try{
+  if(typeof openTaskModal === 'function') window.openTaskModal = openTaskModal; else console.warn('openTaskModal not defined');
+  if(typeof openMemberModal === 'function') window.openMemberModal = openMemberModal; else console.warn('openMemberModal not defined');
+  if(typeof openProjectModal === 'function') window.openProjectModal = openProjectModal; else console.warn('openProjectModal not defined');
+  if(typeof openBillModal === 'function') window.openBillModal = openBillModal; else console.warn('openBillModal not defined');
+  if(typeof openAgreementModal === 'function') window.openAgreementModal = openAgreementModal; else console.warn('openAgreementModal not defined');
+}catch(e){ console.warn('Error exposing modal helpers:', e); }
+
 // openCardModal moved to modules/card-modal.js to keep main.js small
 
 /* ============================= RENDER DISPATCH ============================= */
@@ -704,6 +713,8 @@ async function render(){
     toast('A display error was caught — data untouched');
   }
 }
+// Make render available on window for modules that call `window.render()`
+window.render = render;
 
 window.addEventListener('error', (e)=>{
   console.error('Caught error:', e.error || e.message);
