@@ -137,6 +137,10 @@ const STATUS_COLS = [
 
 let charts = {};
 
+// Expose shared runtime objects for lazy-loaded modules
+window.state = state;
+window.STATUS_COLS = STATUS_COLS;
+
 /* ============================= HELPERS ============================= */
 function member(id){ return state.members.find(m=>m.id===id); }
 function project(id){ return state.projects.find(p=>p.id===id); }
@@ -276,41 +280,13 @@ function renderDashboard(){
     render();
   });
 
-  try{
-    Object.values(charts).forEach(c=>c && c.destroy && c.destroy());
-
-    const statusCounts = STATUS_COLS.map(s=> state.tasks.filter(t=>t.status===s.key).length);
-    charts.status = new Chart(document.getElementById('chartStatus'), {
-      type:'doughnut',
-      data:{ labels: STATUS_COLS.map(s=>s.label), datasets:[{ data: statusCounts, backgroundColor:['#8B98A5','#F2B84B','#8AA4FF','#5FBF7A'], borderColor:'#161D22', borderWidth:2 }]},
-      options:{ plugins:{ legend:{ position:'bottom', labels:{ color:'#8B98A5', font:{family:'Inter', size:11}, boxWidth:10 } } }, maintainAspectRatio:false }
-    });
-
-    const wlLabels = state.members.map(m=>m.name.split(' ')[0]);
-    const wlData = state.members.map(m => state.tasks.filter(t=>t.assigneeId===m.id && t.status!=='done').reduce((a,t)=>a+t.hours,0));
-    charts.workload = new Chart(document.getElementById('chartWorkload'), {
-      type:'bar',
-      data:{ labels: wlLabels, datasets:[{ label:'Assigned hrs', data: wlData, backgroundColor:'#F2B84B', borderRadius:4, maxBarThickness:34 }]},
-      options:{ scales:{ x:{ ticks:{color:'#8B98A5'}, grid:{display:false} }, y:{ ticks:{color:'#8B98A5'}, grid:{color:'#232C33'} } }, plugins:{legend:{display:false}}, maintainAspectRatio:false }
-    });
-
-    const projDone = state.projects.map(p => state.tasks.filter(t=>t.projectId===p.id && t.status==='done').length);
-    const projTotal = state.projects.map(p => state.tasks.filter(t=>t.projectId===p.id).length);
-    const projRemaining = projTotal.map((t,i)=>t - projDone[i]);
-    charts.projects = new Chart(document.getElementById('chartProjects'), {
-      type:'bar',
-      data:{ labels: state.projects.map(p=>p.name), datasets:[
-        { label:'Done', data: projDone, backgroundColor:'#5FBF7A', stack:'s', borderRadius:4 },
-        { label:'Remaining', data: projRemaining, backgroundColor:'#2A333C', stack:'s', borderRadius:4 },
-      ]},
-      options:{ indexAxis:'y', scales:{ x:{ stacked:true, ticks:{color:'#8B98A5'}, grid:{color:'#232C33'} }, y:{ stacked:true, ticks:{color:'#E8EDF1'}, grid:{display:false} } }, plugins:{ legend:{ position:'bottom', labels:{color:'#8B98A5', boxWidth:10} } }, maintainAspectRatio:false }
-    });
-  }catch(err){
+  // Initialize charts lazily to reduce initial parse cost
+  import('./modules/charts.js').then(mod => mod.initDashboardCharts(charts)).catch(err=>{
     console.error('Chart render failed:', err);
     document.querySelectorAll('.chart-wrap').forEach(el=>{
       el.innerHTML = '<div class="empty">Chart unavailable right now — figures are still accurate in the other views.</div>';
     });
-  }
+  });
 
   renderDeadlines();
   renderHealth();
@@ -1570,70 +1546,15 @@ function openExportModal(){
     closeModal();
     toast('Building PDF…');
     try{
-      await buildExportPDF(selected);
+      // Load PDF builder lazily (heavy). modules/pdf.js reuses section renderers already on window.
+      const mod = await import('./modules/pdf.js');
+      await mod.buildExportPDF(selected);
       toast('PDF exported');
     }catch(err){
       console.error(err);
       toast('Export failed — see console');
     }
   });
-}
-
-/* -- Build the multi-section PDF -- */
-async function buildExportPDF(selected){
-  const { PDFDocument, StandardFonts, rgb } = PDFLib;
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const form = pdfDoc.getForm();
-
-  const rgbFn = (typeof rgb === 'function')
-    ? rgb
-    : (r, g, b) => {
-        try {
-          return PDFLib && typeof PDFLib.rgb === 'function' ? PDFLib.rgb(r, g, b) : { r, g, b };
-        } catch (e) {
-          return { r, g, b };
-        }
-      };
-
-  const colors = {
-    dark:  rgbFn(0.08, 0.08, 0.1),
-    body:  rgbFn(0.20, 0.20, 0.22),
-    dim:   rgbFn(0.45, 0.45, 0.48),
-    faint: rgbFn(0.55, 0.55, 0.58),
-    accent:rgbFn(0.86, 0.62, 0.16),
-    line:  rgbFn(0.84, 0.85, 0.87),
-    headerBg: rgbFn(0.92, 0.93, 0.95),
-    zebra: rgbFn(0.965, 0.966, 0.97),
-    // Flag colors
-    flagUrgent: rgbFn(0.91,0.41,0.41),
-    flagReviewed: rgbFn(0.54,0.64,1.0),
-    flagRecurring: rgbFn(0.31,0.82,0.75),
-    flagTaxExempt: rgbFn(0.61,0.43,0.89),
-    flagFinal: rgbFn(0.95,0.72,0.31),
-  };
-
-  const ctx = makePdfCtx(pdfDoc, font, fontBold, form, colors);
-
-  if(selected.includes('dashboard')) pdfDashboard(ctx);
-  if(selected.includes('kanban')) pdfKanban(ctx);
-  if(selected.includes('workload')) pdfWorkload(ctx);
-  if(selected.includes('projects')) pdfProjects(ctx);
-  if(selected.includes('team')) pdfTeam(ctx);
-  if(selected.includes('bills')) pdfBills(ctx);
-  if(selected.includes('agreements')) pdfAgreements(ctx);
-
-  if(!ctx.page) ctx.header('Ops Console', 'No sections were selected for export.');
-
-  const bytes = await pdfDoc.save();
-  const blob = new Blob([bytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ops-console-export.pdf';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
 }
 
 document.getElementById('exportBtn').addEventListener('click', openExportModal);
