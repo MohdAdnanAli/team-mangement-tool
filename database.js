@@ -82,7 +82,8 @@ const DB = (() => {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT '',
-      capacity INTEGER NOT NULL DEFAULT 40
+      capacity INTEGER NOT NULL DEFAULT 40,
+      avatar TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS projects (
@@ -151,10 +152,10 @@ const DB = (() => {
 
     db.run('BEGIN TRANSACTION');
 
-    db.run(`INSERT INTO members VALUES ('mem-1','Abhijeet','Low-Level Design',38)`);
-    db.run(`INSERT INTO members VALUES ('mem-2','Pandey Ji','Model and protype',35)`);
-    db.run(`INSERT INTO members VALUES ('mem-3','Ashutosh Ji','High-Level Design',32)`);
-    db.run(`INSERT INTO members VALUES ('mem-4','Jaiswal','Veriification team',30)`);
+    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-1','Abhijeet','Low-Level Design',38,'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80')`);
+    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-2','Pandey Ji','Model and protype',35,'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80')`);
+    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-3','Ashutosh Ji','High-Level Design',32,'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80')`);
+    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-4','Jaiswal','Veriification team',30,'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80')`);
 
     db.run(`INSERT INTO projects VALUES ('proj-1','Dashboard','#4FD1C5')`);
     db.run(`INSERT INTO projects VALUES ('proj-2','Profile','#F2B84B')`);
@@ -176,8 +177,8 @@ const DB = (() => {
     db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
     db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
 
-    db.run(`INSERT INTO bills VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.')`);
-    db.run(`INSERT INTO bills VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes) VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31','["urgent","reviewed"]',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes) VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31','["recurring"]',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.')`);
 
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Dashboard UI development',24,2500)`);
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Sprint planning & code review',8,2500)`);
@@ -281,6 +282,17 @@ const DB = (() => {
           }
         }
       }catch(e){ console.warn('Migration check for tasks.meta failed', e); }
+
+      // Migration: add `avatar` column to members if it doesn't exist (for existing DBs)
+      try{
+        const pragmaMembers = db.exec("PRAGMA table_info('members')");
+        if(pragmaMembers && pragmaMembers.length && pragmaMembers[0].values){
+          const cols = pragmaMembers[0].values.map(v => v[1]);
+          if(!cols.includes('avatar')){
+            db.run("ALTER TABLE members ADD COLUMN avatar TEXT DEFAULT ''");
+          }
+        }
+      }catch(e){ console.warn('Migration check for members.avatar failed', e); }
 
       // Seed if empty
       seedDefaults();

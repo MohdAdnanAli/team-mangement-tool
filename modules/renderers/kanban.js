@@ -82,7 +82,9 @@ export function renderKanban(){
         <div style="margin-top:6px">${labelsHTML}</div>
         <div class="ticket-meta">
           <span class="tag prio-${t.priority}">${t.priority}</span>
-          <span class="avatar" title="${m?m.name:'Unassigned'}">${m?window.initials(m.name):'—'}</span>
+          <span class="avatar ${m && m.avatar ? 'has-image' : ''}" title="${m?m.name:'Unassigned'}">
+            ${m && m.avatar ? `<img src="${window.escapeHTML(m.avatar)}" alt="${window.escapeHTML(m.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="avatar-fallback" style="display:none;">${window.initials(m.name)}</span>` : (m ? window.initials(m.name) : '—')}
+          </span>
         </div>
         <div class="ticket-foot">
           <span><span class="proj-dot" style="background:${p?p.color:'#666'}"></span>${p?p.name:'—'}</span>

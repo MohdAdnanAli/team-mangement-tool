@@ -8,7 +8,9 @@ export function renderTeam(){
     <div class="team-grid">
       ${window.state.members.map(m=>`
         <div class="member-card">
-          <div class="member-avatar">${window.initials(m.name)}</div>
+          <div class="member-avatar ${m.avatar ? 'has-image' : ''}">
+            ${m.avatar ? `<img src="${window.escapeHTML(m.avatar)}" alt="${window.escapeHTML(m.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="member-fallback" style="display:none;">${window.initials(m.name)}</span>` : `<span class="member-fallback">${window.initials(m.name)}</span>`}
+          </div>
           <div class="member-body">
             <div class="card-top-row">
               <div class="member-name">${window.escapeHTML(m.name)}</div>

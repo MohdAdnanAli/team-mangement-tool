@@ -109,7 +109,8 @@
   }
 
   .brand{display:flex; align-items:center; gap:9px; padding:0 6px 22px; border-bottom:1px solid var(--border-soft); margin-bottom:16px;}
-  .brand-mark{width:26px; height:26px; border-radius:5px; background:linear-gradient(135deg, var(--amber), #d99a2b); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:13px; color:#1a1400; flex-shrink:0;}
+  .brand-mark{width:26px; height:26px; border-radius:5px; overflow:hidden; background:linear-gradient(135deg, var(--amber), #d99a2b); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:13px; color:#1a1400; flex-shrink:0;}
+  .brand-mark img{width:100%; height:100%; object-fit:cover; display:block;}
   .brand-text{font-family:var(--font-display); font-weight:700; font-size:15px; letter-spacing:0.2px;}
   .brand-sub{font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); letter-spacing:1px; text-transform:uppercase;}
 
@@ -289,8 +290,12 @@
   .avatar{
     width:22px; height:22px; border-radius:50%; background:var(--blue); color:#0e1420;
     font-family:var(--font-mono); font-size:9.5px; font-weight:700;
-    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; position:relative;
   }
+  .avatar img, .member-avatar img{display:block; width:100%; height:100%; object-fit:cover; border-radius:inherit;}
+  .avatar .avatar-fallback, .member-avatar .member-fallback{display:flex; align-items:center; justify-content:center; width:100%; height:100%; background:var(--blue); color:#0e1420; font-family:var(--font-mono); font-weight:700;}
+  .avatar.has-image .avatar-fallback, .member-avatar.has-image .member-fallback{display:none;}
+  .member-avatar.has-image .member-fallback{display:none;}
   .ticket-foot{display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-soft);}
   .due-chip{font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);}
   .due-chip.overdue{color:var(--danger);}
@@ -329,8 +334,11 @@
   .team-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:14px;}
   .member-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 15px; display:flex; gap:11px; align-items:flex-start;}
   .member-body{flex:1; min-width:0;}
-  .member-avatar{width:36px; height:36px; border-radius:50%; background:var(--blue); color:#0e1420; font-family:var(--font-mono); font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .member-avatar{width:36px; height:36px; border-radius:50%; background:var(--blue); color:#0e1420; font-family:var(--font-mono); font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; position:relative;}
   .member-name{font-weight:600; font-size:13.5px;}
+  .avatar-preview{position:relative; width:54px; height:54px; border-radius:50%; background:var(--surface-raised); border:1px solid var(--border); overflow:hidden; display:flex; align-items:center; justify-content:center;}
+  .avatar-preview img{width:100%; height:100%; object-fit:cover; display:block;}
+  .avatar-preview-fallback{display:none; align-items:center; justify-content:center; width:100%; height:100%; font-family:var(--font-mono); font-weight:700; color:#0e1420; background:var(--blue);}
   .member-role{font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-top:1px;}
   .member-cap{font-size:11px; color:var(--text-dim); margin-top:6px;}
 

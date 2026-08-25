@@ -31,14 +31,37 @@ applyTheme();
 /* ============================= STATE ============================= */
 const uid = (p) => p + '-' + Math.random().toString(36).slice(2,7);
 
+const DEFAULT_MEMBER_AVATARS = [
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=240&q=80',
+  'https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&w=240&q=80',
+];
+
+function normalizeMemberAvatar(value, fallbackName=''){
+  const trimmed = String(value || '').trim();
+  if(trimmed){
+    try{
+      const parsed = new URL(trimmed);
+      if(['http:','https:','data:'].includes(parsed.protocol)) return trimmed;
+    }catch(_e){}
+  }
+  if(!fallbackName) return DEFAULT_MEMBER_AVATARS[0];
+  let hash = 0;
+  for(let i=0; i<fallbackName.length; i++) hash = (hash * 31 + fallbackName.charCodeAt(i)) >>> 0;
+  return DEFAULT_MEMBER_AVATARS[hash % DEFAULT_MEMBER_AVATARS.length];
+}
+
 const state = {
   view: 'dashboard',
   taskSeq: 13,
   members: [
-    {id:'mem-1', name:'Abhijeet', role:'Low-Level Design', capacity:38},
-    {id:'mem-2', name:'Pandey Ji', role:'Model and protype', capacity:35},
-    {id:'mem-3', name:'Ashutosh Ji', role:'High-Level Design', capacity:32},
-    {id:'mem-4', name:'Jaiswal', role:'Veriification team', capacity:30},
+    {id:'mem-1', name:'Abhijeet', role:'Low-Level Design', capacity:38, avatar: normalizeMemberAvatar('', 'Abhijeet')},
+    {id:'mem-2', name:'Pandey Ji', role:'Model and protype', capacity:35, avatar: normalizeMemberAvatar('', 'Pandey Ji')},
+    {id:'mem-3', name:'Ashutosh Ji', role:'High-Level Design', capacity:32, avatar: normalizeMemberAvatar('', 'Ashutosh Ji')},
+    {id:'mem-4', name:'Jaiswal', role:'Veriification team', capacity:30, avatar: normalizeMemberAvatar('', 'Jaiswal')},
   ],
   projects: [
     {id:'proj-1', name:'Dashboard', color:'#4FD1C5'},
@@ -218,7 +241,9 @@ function renderTeam(){
     <div class="team-grid">
       ${state.members.map(m=>`
         <div class="member-card">
-          <div class="member-avatar">${initials(m.name)}</div>
+          <div class="member-avatar ${m.avatar ? 'has-image' : ''}">
+            ${m.avatar ? `<img src="${escapeHTML(m.avatar)}" alt="${escapeHTML(m.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="member-fallback" style="display:none;">${initials(m.name)}</span>` : `<span class="member-fallback">${initials(m.name)}</span>`}
+          </div>
           <div class="member-body">
             <div class="card-top-row">
               <div class="member-name">${escapeHTML(m.name)}</div>
@@ -607,28 +632,64 @@ function openTaskModal(){
 }
 
 function openMemberModal(existing){
+  const avatarValue = existing && existing.avatar ? existing.avatar : normalizeMemberAvatar('', existing ? existing.name : '');
   openModal(`
     <div class="modal-title">${existing ? 'Edit teammate' : 'Add teammate'}</div>
     <div class="field"><label>Name</label><input id="mName" placeholder="e.g. Rhea Kapoor" value="${existing ? escapeHTML(existing.name) : ''}"></div>
     <div class="field"><label>Role</label><input id="mRole" placeholder="e.g. Backend Engineer" value="${existing ? escapeHTML(existing.role) : ''}"></div>
     <div class="field"><label>Weekly capacity (hrs)</label><input id="mCap" type="number" min="1" value="${existing ? existing.capacity : 40}"></div>
+    <div class="field"><label>Avatar URL</label><input id="mAvatar" type="url" placeholder="https://images.unsplash.com/..." value="${escapeHTML(avatarValue)}"></div>
+    <div class="field">
+      <label>Preview</label>
+      <div class="avatar-preview">
+        <img id="mAvatarPreview" src="${escapeHTML(avatarValue)}" alt="Member avatar preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <span class="avatar-preview-fallback" style="display:none;">${existing ? initials(existing.name) : 'A'}</span>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
       <button class="btn btn-primary" id="saveMemberBtn">${existing ? 'Save changes' : 'Add teammate'}</button>
     </div>
   `);
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('mAvatar').addEventListener('input', ()=>{
+    const img = document.getElementById('mAvatarPreview');
+    const fallback = document.querySelector('.avatar-preview-fallback');
+    const value = document.getElementById('mAvatar').value.trim();
+    if(!value){
+      img.src = normalizeMemberAvatar('', document.getElementById('mName').value.trim() || 'Teammate');
+      img.style.display = 'block';
+      if(fallback) fallback.style.display = 'none';
+      return;
+    }
+    img.src = value;
+    img.style.display = 'block';
+    if(fallback) fallback.style.display = 'none';
+  });
+  document.getElementById('mName').addEventListener('input', ()=>{
+    const img = document.getElementById('mAvatarPreview');
+    const fallback = document.querySelector('.avatar-preview-fallback');
+    const currentValue = document.getElementById('mAvatar').value.trim();
+    if(!currentValue || currentValue === normalizeMemberAvatar('', existing ? existing.name : '')){
+      const next = normalizeMemberAvatar('', document.getElementById('mName').value.trim() || 'Teammate');
+      img.src = next;
+      document.getElementById('mAvatar').value = next;
+      img.style.display = 'block';
+      if(fallback) fallback.style.display = 'none';
+    }
+  });
   document.getElementById('saveMemberBtn').addEventListener('click', ()=>{
     const name = document.getElementById('mName').value.trim();
     if(!name){ toast('Name is required'); return; }
     const role = document.getElementById('mRole').value.trim() || 'Contributor';
     const capacity = Number(document.getElementById('mCap').value) || 40;
+    const avatar = normalizeMemberAvatar(document.getElementById('mAvatar').value, name);
     if(existing){
-      existing.name = name; existing.role = role; existing.capacity = capacity;
-      DB.update('members', { name, role, capacity }, 'id', existing.id);
+      existing.name = name; existing.role = role; existing.capacity = capacity; existing.avatar = avatar;
+      DB.update('members', { name, role, capacity, avatar }, 'id', existing.id);
       toast('Teammate updated');
     } else {
-      const mem = { id: uid('mem'), name, role, capacity };
+      const mem = { id: uid('mem'), name, role, capacity, avatar };
       state.members.push(mem);
       DB.insert('members', mem);
       toast('Teammate added');
