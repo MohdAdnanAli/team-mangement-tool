@@ -163,18 +163,18 @@ const DB = (() => {
     db.run(`INSERT INTO projects VALUES ('proj-5','otp and mail services','#5FBF7A')`);
     db.run(`INSERT INTO projects VALUES ('proj-6','Entity Relation and clean design','#C792EA')`);
 
-    db.run(`INSERT INTO tasks VALUES ('TSK-001','Ship new pricing page hero','proj-1','mem-1','progress','high','2026-08-02',8)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-002','Wire up billing webhook retries','proj-1','mem-2','todo','high','2026-08-05',12)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-003','Redesign onboarding checklist UI','proj-2','mem-3','review','med','2026-08-01',6)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-004','Write regression suite for auth','proj-3','mem-4','progress','med','2026-08-08',10)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-005','Fix Safari flex bug on dashboard','proj-1','mem-1','done','low','2026-07-22',3)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-006','Customer migration runbook','proj-2','mem-2','todo','med','2026-08-10',5)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-007','Internal CLI: add dry-run flag','proj-3','mem-2','done','low','2026-07-20',4)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-008','Design system: audit spacing tokens','proj-3','mem-3','todo','low','2026-08-14',7)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-010','Entity 101','proj-6','mem-1','todo','low','2026-10-05',6)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-011','services 101','proj-4','mem-2','progress','med','2026-10-05',8)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5)`);
-    db.run(`INSERT INTO tasks VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7)`);
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-001','Ship new pricing page hero','proj-1','mem-1','progress','high','2026-08-02',8,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-002','Wire up billing webhook retries','proj-1','mem-2','todo','high','2026-08-05',12,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-003','Redesign onboarding checklist UI','proj-2','mem-3','review','med','2026-08-01',6,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-004','Write regression suite for auth','proj-3','mem-4','progress','med','2026-08-08',10,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-005','Fix Safari flex bug on dashboard','proj-1','mem-1','done','low','2026-07-22',3,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-006','Customer migration runbook','proj-2','mem-2','todo','med','2026-08-10',5,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-007','Internal CLI: add dry-run flag','proj-3','mem-2','done','low','2026-07-20',4,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-008','Design system: audit spacing tokens','proj-3','mem-3','todo','low','2026-08-14',7,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-010','Entity 101','proj-6','mem-1','todo','low','2026-10-05',6,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-011','services 101','proj-4','mem-2','progress','med','2026-10-05',8,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
+    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
 
     db.run(`INSERT INTO bills VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.')`);
     db.run(`INSERT INTO bills VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.')`);
@@ -202,6 +202,41 @@ const DB = (() => {
     db.run(`INSERT INTO agreements VALUES ('agr-1','Aurora Corp — Retainer terms','Aurora Corp (client)','₹1,20,000 / month','active','2026-06-01','Verbally agreed on the July 14 call: monthly retainer covers up to 40 hrs of dev work. Anything beyond is billed at ₹2,500/hr, invoiced separately. Retainer ends the month after either side gives written notice — no lock-in period.')`);
     db.run(`INSERT INTO agreements VALUES ('agr-2','Karan — overtime comp','Karan Mehta (internal)','1.5x day rate','settled','2026-05-10','Agreed verbally during the QA crunch: any weekend testing gets 1.5x day rate, paid out with the next cycle. Already settled for the May sprint — no balance owed.')`);
     db.run('COMMIT');
+  }
+
+  /* -- Detect and fix corrupted task rows that happened when schema changed -- */
+  function detectAndFixCorruptTasks(){
+    try{
+      const rows = queryAll('SELECT id,title,projectId,assigneeId,due FROM tasks');
+      if(!rows || rows.length===0) return;
+      let bad = 0;
+      for(const r of rows){
+        const t = String(r.title || '');
+        // title should not be a project id or a date; if it looks like 'proj-' or YYYY-MM-DD, count as bad
+        if(/^proj-/.test(t) || /^mem-/.test(t) || /^\d{4}-\d{2}-\d{2}$/.test(t) || t.length < 3) bad++;
+      }
+      const ratio = bad / rows.length;
+      if(ratio > 0.4){
+        console.warn('Detected corrupted tasks seed (ratio=' + ratio + '), re-seeding tasks.');
+        db.run('BEGIN TRANSACTION');
+        db.run('DELETE FROM tasks');
+        // re-insert canonical seed rows (explicit columns include meta)
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-001','Ship new pricing page hero','proj-1','mem-1','progress','high','2026-08-02',8,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-002','Wire up billing webhook retries','proj-1','mem-2','todo','high','2026-08-05',12,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-003','Redesign onboarding checklist UI','proj-2','mem-3','review','med','2026-08-01',6,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-004','Write regression suite for auth','proj-3','mem-4','progress','med','2026-08-08',10,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-005','Fix Safari flex bug on dashboard','proj-1','mem-1','done','low','2026-07-22',3,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-006','Customer migration runbook','proj-2','mem-2','todo','med','2026-08-10',5,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-007','Internal CLI: add dry-run flag','proj-3','mem-2','done','low','2026-07-20',4,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-008','Design system: audit spacing tokens','proj-3','mem-3','todo','low','2026-08-14',7,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-010','Entity 101','proj-6','mem-1','todo','low','2026-10-05',6,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-011','services 101','proj-4','mem-2','progress','med','2026-10-05',8,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
+        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
+        db.run('COMMIT');
+        scheduleSave();
+      }
+    }catch(e){ console.warn('Task corruption detection failed', e); }
   }
 
   /* ---------- Init ---------- */
@@ -250,6 +285,8 @@ const DB = (() => {
       // Seed if empty
       seedDefaults();
       seedAgreements();
+      // Detect and fix any corrupted task rows from prior schema changes
+      detectAndFixCorruptTasks();
 
       ready = true;
       readyCallbacks.forEach(fn => fn());
