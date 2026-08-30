@@ -1,4 +1,4 @@
-export function renderBills(){
+function renderBills(){
   const view = document.getElementById('view');
   const memberOptions = window.state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
 
@@ -89,21 +89,24 @@ export function renderBills(){
   }
 
   function billCardHTML(b){
-    const m = window.billMember(b);
-    const sub = window.calcSubtotal(b.lineItems);
-    const tax = window.calcTax(sub, b.taxRate);
+    const items = Array.isArray(b.lineItems) ? b.lineItems : [];
+    const sub = window.calcSubtotal(items);
+    const tax = window.isTaxExempt && window.isTaxExempt(b) ? 0 : window.calcTax(sub, b.taxRate);
     const total = sub + tax;
-    const overdue = b.status==='sent' && new Date(b.dueDate) < window.todayUTC();
+    const overdue = b.status==='sent' && b.dueDate && new Date(b.dueDate) < window.todayUTC();
     const effectiveStatus = overdue ? 'overdue' : b.status;
     if(overdue && b.status!=='overdue'){ b.status='overdue'; DB.update('bills', { status:'overdue' }, 'id', b.id); }
     const statusCls = window.billStatusClass(effectiveStatus);
+    const party = window.billPartyLabel ? window.billPartyLabel(b) : (window.billMember(b) ? window.billMember(b).name : 'Unassigned');
+    const worker = window.billMember(b);
 
     return `
       <div class="invoice-card ${b._expanded?'expanded':''}">
         <div class="invoice-head" data-bill-toggle>
           <div class="invoice-head-left">
             <span class="invoice-num">${b.billNumber}</span>
-            <span class="invoice-member">${m ? window.escapeHTML(m.name) : 'Unassigned'}</span>
+            <span class="invoice-member">${window.escapeHTML(party)}</span>
+            ${worker && (b.party || '').trim() ? `<span class="invoice-member" style="opacity:.7">via ${window.escapeHTML(worker.name)}</span>` : ''}
             ${b.flags && b.flags.length ? `<span class="invoice-flags">${b.flags.map(f=>`<span class="flag-pill ${f}">${window.escapeHTML((f||'').charAt(0).toUpperCase()+ (f||'').slice(1))}</span>`).join('')}</span>` : ''}
             <span class="status-pill ${statusCls}">${effectiveStatus}</span>
           </div>
@@ -118,7 +121,7 @@ export function renderBills(){
           <table class="invoice-table">
             <thead><tr><th>Description</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead>
             <tbody>
-              ${b.lineItems.map(li => `
+              ${(items).map(li => `
                 <tr>
                   <td>${window.escapeHTML(li.description)}</td>
                   <td>${li.hours}</td>
@@ -130,7 +133,7 @@ export function renderBills(){
 
           <div class="invoice-totals">
             <div><span>Subtotal</span><span>${window.formatCurrency(sub)}</span></div>
-            <div><span>Tax (${b.taxRate}%)</span><span>${window.formatCurrency(tax)}</span></div>
+            <div><span>Tax (${window.isTaxExempt && window.isTaxExempt(b) ? 'exempt' : (b.taxRate + '%')})</span><span>${window.formatCurrency(tax)}</span></div>
             <div class="grand-total"><span>Total</span><span>${window.formatCurrency(total)}</span></div>
           </div>
 
@@ -150,3 +153,4 @@ export function renderBills(){
       </div>`;
   }
 }
+window.renderBills = renderBills;

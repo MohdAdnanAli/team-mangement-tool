@@ -1,7 +1,7 @@
-export const PAGE_W = 612, PAGE_H = 792, MARGIN = 50;
-export const CONTENT_W = PAGE_W - MARGIN * 2;
+const PAGE_W = 612, PAGE_H = 792, MARGIN = 50;
+const CONTENT_W = PAGE_W - MARGIN * 2;
 
-export function sanitizePdfText(text){
+function sanitizePdfText(text){
   return String(text == null ? '' : text)
     export const PAGE_W = 612, PAGE_H = 792, MARGIN = 50;
     export const CONTENT_W = PAGE_W - MARGIN * 2;
@@ -124,7 +124,7 @@ export function sanitizePdfText(text){
     [3, 1, 1, 1.2]);
 }
 
-export function pdfKanban(ctx){
+function pdfKanban(ctx){
   ctx.header('Kanban', 'TICKETS GROUPED BY STATUS — ' + window.state.tasks.length + ' TOTAL');
   window.STATUS_COLS.forEach(col => {
     const tasks = window.state.tasks.filter(t => t.status === col.key);
@@ -147,7 +147,7 @@ export function pdfKanban(ctx){
   });
 }
 
-export function pdfWorkload(ctx){
+function pdfWorkload(ctx){
   ctx.header('Workload', 'ACTIVE HOURS VS WEEKLY CAPACITY');
   drawTable(ctx,
     ['Teammate', 'Role', 'Active hrs', 'Capacity', 'Utilization'],
@@ -159,7 +159,7 @@ export function pdfWorkload(ctx){
     [1.8, 2.2, 1, 1, 1]);
 }
 
-export function pdfProjects(ctx){
+function pdfProjects(ctx){
   ctx.header('Projects', window.state.projects.length + ' ACTIVE');
   drawTable(ctx,
     ['Project', 'Accent', 'Done', 'Total', '% Complete'],
@@ -171,7 +171,7 @@ export function pdfProjects(ctx){
     [2.4, 1.2, 0.8, 0.8, 1.2]);
 }
 
-export function pdfTeam(ctx){
+function pdfTeam(ctx){
   ctx.header('Team', window.state.members.length + ' MEMBERS');
   drawTable(ctx,
     ['Name', 'Role', 'Weekly capacity'],
@@ -179,7 +179,7 @@ export function pdfTeam(ctx){
     [1.6, 2.2, 1.2]);
 }
 
-export function pdfBills(ctx){
+function pdfBills(ctx){
   ctx.header('Bills & Invoices', window.state.bills.length + ' INVOICES');
   const totalBilled = window.state.bills.reduce((s, b) => s + window.calcBillTotal(b), 0);
   ctx.paragraph('Total billed: ' + window.formatCurrency(totalBilled));
@@ -189,11 +189,11 @@ export function pdfBills(ctx){
     return;
   }
   window.state.bills.forEach(b => {
-    const m = window.member(b);
+    const party = window.billPartyLabel ? window.billPartyLabel(b) : 'Unassigned';
     const sub = window.calcSubtotal(b.lineItems);
-    const tax = window.calcTax(sub, b.taxRate);
-    const total = sub + tax;
-    ctx.sectionTitle(b.billNumber + ' — ' + (m ? m.name : 'Unassigned') + '  ·  ' + b.status);
+    const tax = window.isTaxExempt && window.isTaxExempt(b) ? 0 : window.calcTax(sub, b.taxRate);
+    const total = window.calcBillTotal(b);
+    ctx.sectionTitle(b.billNumber + ' — ' + party + '  ·  ' + b.status);
     ctx.paragraph('Period: ' + b.periodStart + ' → ' + b.periodEnd + '   |   Issued: ' + b.issueDate + '   |   Due: ' + b.dueDate, 8.5, ctx.colors.faint, 11);
     if(b.flags && b.flags.length){
       ctx.ensureSpace(18);
@@ -219,13 +219,13 @@ export function pdfBills(ctx){
       ['Description', 'Hours', 'Rate', 'Amount'],
       b.lineItems.map(li => [li.description, String(li.hours), window.formatCurrency(li.rate) + '/hr', window.formatCurrency(li.hours * li.rate)]),
       [2.4, 0.7, 0.9, 1]);
-    ctx.paragraph('Subtotal: ' + window.formatCurrency(sub) + '   |   Tax (' + b.taxRate + '%): ' + window.formatCurrency(tax) + '   |   Total: ' + window.formatCurrency(total), 9, ctx.colors.dark);
+    ctx.paragraph('Subtotal: ' + window.formatCurrency(sub) + '   |   Tax (' + (window.isTaxExempt && window.isTaxExempt(b) ? 'exempt' : b.taxRate + '%') + '): ' + window.formatCurrency(tax) + '   |   Total: ' + window.formatCurrency(total), 9, ctx.colors.dark);
     if(b.notes) ctx.paragraph('Notes: ' + b.notes, 8.5, ctx.colors.faint, 11);
     ctx.y -= 8;
   });
 }
 
-export function pdfAgreements(ctx){
+function pdfAgreements(ctx){
   ctx.header('Agreements', 'VERBAL DEALS & BILLING TERMS');
   if(!window.state.agreements.length){
     ctx.paragraph('No agreements logged yet.', 9.5, ctx.colors.faint);

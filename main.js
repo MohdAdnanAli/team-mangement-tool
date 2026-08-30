@@ -164,10 +164,9 @@ window.charts = {};
 window.state = state;
 window.STATUS_COLS = STATUS_COLS;
 
-/* ============================= HELPERS (lazy-loaded) ============================= */
-// Load helper functions into the global scope to keep initial parse small.
-window._helpersReady = import('./modules/helpers.js').then(h=>{ Object.assign(window, h); }).catch(err=>{ console.error('Failed to load helpers:', err); });
-window._modalsReady = import('./modules/modals.js').then(m=>{ Object.assign(window, m); if(window.initModalBackdrop) window.initModalBackdrop(); return m; }).catch(err=>{ console.error('Failed to load modals:', err); });
+/* Shared helpers, renderers, and reputation tools are loaded as classic scripts
+ * in index.html so opening this app directly from disk also works. */
+initModalBackdrop();
 
 /* ============================= NAV ============================= */
 const NAV = [
@@ -176,6 +175,7 @@ const NAV = [
   {key:'workload', icon:'▮', label:'Workload'},
   {key:'projects', icon:'◫', label:'Projects'},
   {key:'team', icon:'◍', label:'Team'},
+  {key:'oneonones', icon:'◎', label:'One on ones'},
   {key:'bills', icon:'💰', label:'Bills'},
   {key:'agreements', icon:'✎', label:'Agreements'},
 ];
@@ -186,6 +186,7 @@ function renderNav(){
     let count = '';
     if(n.key==='kanban') count = state.tasks.length;
     if(n.key==='team') count = state.members.length;
+    if(n.key==='oneonones') count = (state.oneOnOnes || []).length;
     if(n.key==='projects') count = state.projects.length;
     if(n.key==='bills') count = state.bills.length;
     if(n.key==='agreements') count = state.agreements.length;
@@ -231,7 +232,7 @@ function renderTicker(){
 /* Projects renderer moved to modules/renderers/projects.js */
 
 /* ============================= TEAM ============================= */
-function renderTeam(){
+function legacyRenderTeam(){
   const view = document.getElementById('view');
   view.innerHTML = `
     <div class="view-head">
@@ -272,14 +273,14 @@ function renderTeam(){
       state.tasks.forEach(t=>{ if(t.assigneeId===m.id){ t.assigneeId=''; DB.update('tasks', { assigneeId:'' }, 'id', t.id); } });
       state.members = state.members.filter(x=>x.id!==m.id);
       DB.remove('members', 'id', m.id);
-      renderNav(); renderTicker(); renderTeam();
+      renderNav(); renderTicker(); window.renderTeam();
       toast('Teammate removed');
     });
   });
 }
 
 /* ============================= BILLS ============================= */
-function renderBills(){
+function legacyRenderBills(){
   const view = document.getElementById('view');
   const memberOptions = state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
 
@@ -322,6 +323,7 @@ function renderBills(){
   drawBills();
 
   /* Bills renderer moved to modules/renderers/bills.js */
+}
 
 
 function billCardHTML(b){
@@ -407,7 +409,8 @@ function openBillModal(existing){
 
   openModal(`
     <div class="modal-title">${existing ? 'Edit invoice' : 'New invoice'}</div>
-    <div class="field"><label>Bill to (team member)</label><select id="fBillMember">${memberOptions}</select></div>
+    <div class="field"><label>Bill to (client / company)</label><input id="fBillParty" placeholder="e.g. Aurora Corp" value="${existing ? escapeHTML(existing.party || '') : ''}"></div>
+    <div class="field"><label>Work owner (team member, optional)</label><select id="fBillMember"><option value="">No internal owner</option>${memberOptions}</select></div>
     <div class="row2">
       <div class="field"><label>Period start</label><input id="fPeriodStart" type="date" value="${existing ? existing.periodStart : todayStr()}"></div>
       <div class="field"><label>Period end</label><input id="fPeriodEnd" type="date" value="${existing ? existing.periodEnd : monthEndStr()}"></div>
@@ -485,6 +488,7 @@ function openBillModal(existing){
 
   document.getElementById('saveBillBtn').addEventListener('click', ()=>{
     const memberId = document.getElementById('fBillMember').value;
+    const party = document.getElementById('fBillParty').value.trim();
     const periodStart = document.getElementById('fPeriodStart').value;
     const periodEnd = document.getElementById('fPeriodEnd').value;
     const taxRate = parseInt(document.getElementById('fTaxRate').value) || 0;
@@ -501,10 +505,12 @@ function openBillModal(existing){
       if(desc && hrs>0 && rate>0) items.push({ description:desc, hours:hrs, rate });
     });
 
+    if(!party){ toast('Enter the client or company being billed'); return; }
     if(items.length===0){ toast('Add at least one line item'); return; }
 
     if(existing){
       existing.memberId = memberId;
+      existing.party = party;
       existing.periodStart = periodStart;
       existing.periodEnd = periodEnd;
       existing.lineItems = items;
@@ -515,7 +521,7 @@ function openBillModal(existing){
       existing.notes = notes;
       const flags = Array.from(document.querySelectorAll('.flag-checkbox:checked')).map(i=>i.value);
       existing.flags = flags;
-      DB.update('bills', { memberId, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes }, 'id', existing.id);
+      DB.update('bills', { memberId, party, periodStart, periodEnd, taxRate, status, issueDate, dueDate, notes }, 'id', existing.id);
       DB.update('bills', { flags: JSON.stringify(existing.flags) }, 'id', existing.id);
       DB.replaceLineItems(existing.id, items);
       toast('Invoice updated');
@@ -523,6 +529,7 @@ function openBillModal(existing){
       const bill = {
         id: uid('bill'),
         memberId,
+        party,
         billNumber: nextBillNumber(),
         periodStart,
         periodEnd,
@@ -535,12 +542,12 @@ function openBillModal(existing){
         flags: Array.from(document.querySelectorAll('.flag-checkbox:checked')).map(i=>i.value),
       };
       state.bills.push(bill);
-      DB.insert('bills', { id: bill.id, memberId, billNumber: bill.billNumber, periodStart, periodEnd, flags: JSON.stringify(bill.flags), taxRate, issueDate, dueDate, status, notes });
+      DB.insert('bills', { id: bill.id, memberId, party, billNumber: bill.billNumber, periodStart, periodEnd, flags: JSON.stringify(bill.flags), taxRate, issueDate, dueDate, status, notes });
       DB.replaceLineItems(bill.id, items);
       DB.setMeta('billSeq', state.billSeq);
       toast('Invoice created');
     }
-    closeModal(); renderNav(); renderTicker(); renderBills();
+    closeModal(); renderNav(); renderTicker(); window.renderBills();
   });
 }
 
@@ -765,13 +772,14 @@ async function render(){
   try{
     renderNav();
     renderTicker();
-    if(state.view==='dashboard') await import('./modules/renderers/dashboard.js').then(m=>m.renderDashboard());
-    else if(state.view==='kanban') await import('./modules/renderers/kanban.js').then(m=>m.renderKanban());
-    else if(state.view==='workload') await import('./modules/renderers/workload.js').then(m=>m.renderWorkload());
-    else if(state.view==='projects') await import('./modules/renderers/projects.js').then(m=>m.renderProjects());
-    else if(state.view==='team') await import('./modules/renderers/team.js').then(m=>m.renderTeam());
-    else if(state.view==='bills') await import('./modules/renderers/bills.js').then(m=>m.renderBills());
-    else if(state.view==='agreements') await import('./modules/renderers/agreements.js').then(m=>m.renderAgreements());
+    if(state.view==='dashboard') window.renderDashboard();
+    else if(state.view==='kanban') window.renderKanban();
+    else if(state.view==='workload') window.renderWorkload();
+    else if(state.view==='projects') window.renderProjects();
+    else if(state.view==='team') window.renderTeam();
+    else if(state.view==='oneonones') window.renderOneOnOnes();
+    else if(state.view==='bills') window.renderBills();
+    else if(state.view==='agreements') window.renderAgreements();
   }catch(err){
     console.error('Render error:', err);
     const view = document.getElementById('view');
@@ -993,12 +1001,5 @@ document.getElementById('exportBtn').addEventListener('click', openExportModal);
 /* ============================= INIT ============================= */
 DB.onReady(() => {
   DB.restoreState(state);
-  const waits = [];
-  if(window._helpersReady) waits.push(window._helpersReady);
-  if(window._modalsReady) waits.push(window._modalsReady);
-  if(waits.length){
-    Promise.all(waits).then(()=>render()).catch(err=>{ console.error('Module load failed before render:', err); render(); });
-  } else {
-    render();
-  }
+  render();
 });

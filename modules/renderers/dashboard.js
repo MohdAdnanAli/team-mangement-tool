@@ -1,4 +1,4 @@
-export function renderDashboard(){
+function renderDashboard(){
   const view = document.getElementById('view');
   view.innerHTML = `
     <div class="view-head">
@@ -35,12 +35,14 @@ export function renderDashboard(){
     window.render();
   });
 
-  import('../charts.js').then(mod => mod.initDashboardCharts(window.charts)).catch(err=>{
+  try{
+    window.initDashboardCharts(window.charts);
+  }catch(err){
     console.error('Chart render failed:', err);
     document.querySelectorAll('.chart-wrap').forEach(el=>{
       el.innerHTML = '<div class="empty">Chart unavailable right now — figures are still accurate in the other views.</div>';
     });
-  });
+  }
 
   renderDeadlines();
   renderHealth();
@@ -137,3 +139,4 @@ export function renderDashboard(){
     }).join('');
   }
 }
+window.renderDashboard = renderDashboard;

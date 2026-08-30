@@ -1,4 +1,4 @@
-export function renderProjects(){
+function renderProjects(){
   const view = document.getElementById('view');
   view.innerHTML = `
     <div class="view-head">
@@ -48,3 +48,4 @@ export function renderProjects(){
     });
   });
 }
+window.renderProjects = renderProjects;

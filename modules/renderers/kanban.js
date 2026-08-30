@@ -1,4 +1,4 @@
-export function renderKanban(){
+function renderKanban(){
   const view = document.getElementById('view');
   const projOptions = window.state.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   const memberOptions = window.state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
@@ -124,3 +124,4 @@ export function renderKanban(){
     });
   }
 }
+window.renderKanban = renderKanban;

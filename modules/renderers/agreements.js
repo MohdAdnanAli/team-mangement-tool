@@ -1,4 +1,4 @@
-export function renderAgreements(){
+function renderAgreements(){
   const view = document.getElementById('view');
   view.innerHTML = `
     <div class="view-head">
@@ -22,6 +22,7 @@ export function renderAgreements(){
     });
   });
 }
+window.renderAgreements = renderAgreements;
 
 function agreementHTML(a){
   return `

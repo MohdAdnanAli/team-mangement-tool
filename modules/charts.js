@@ -1,4 +1,4 @@
-export function initDashboardCharts(charts){
+function initDashboardCharts(charts){
   try{
     Object.values(charts).forEach(c=>c && c.destroy && c.destroy());
 
@@ -32,3 +32,4 @@ export function initDashboardCharts(charts){
     throw err;
   }
 }
+window.initDashboardCharts = initDashboardCharts;

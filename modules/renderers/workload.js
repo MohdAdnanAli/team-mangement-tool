@@ -1,4 +1,4 @@
-export function renderWorkload(){
+function renderWorkload(){
   const view = document.getElementById('view');
   view.innerHTML = `
     <div class="view-head">
@@ -23,3 +23,4 @@ export function renderWorkload(){
     </div>
   `;
 }
+window.renderWorkload = renderWorkload;

@@ -83,7 +83,8 @@ const DB = (() => {
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT '',
       capacity INTEGER NOT NULL DEFAULT 40,
-      avatar TEXT DEFAULT ''
+      avatar TEXT DEFAULT '',
+      stats TEXT DEFAULT '{}'
     );
 
     CREATE TABLE IF NOT EXISTS projects (
@@ -115,7 +116,8 @@ const DB = (() => {
       issueDate TEXT NOT NULL DEFAULT '',
       dueDate TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'draft',
-      notes TEXT DEFAULT ''
+      notes TEXT DEFAULT '',
+      party TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS line_items (
@@ -134,6 +136,22 @@ const DB = (() => {
       status TEXT NOT NULL DEFAULT 'active',
       dateAgreed TEXT NOT NULL DEFAULT '',
       terms TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS one_on_ones (
+      id TEXT PRIMARY KEY,
+      memberId TEXT NOT NULL,
+      date TEXT NOT NULL DEFAULT '',
+      behaviourScore INTEGER NOT NULL DEFAULT 3,
+      behaviourNote TEXT DEFAULT '',
+      natureScore INTEGER NOT NULL DEFAULT 3,
+      natureNote TEXT DEFAULT '',
+      deadlineScore INTEGER NOT NULL DEFAULT 3,
+      deadlineNote TEXT DEFAULT '',
+      extraScore INTEGER NOT NULL DEFAULT 3,
+      extraNote TEXT DEFAULT '',
+      extraTags TEXT DEFAULT '[]',
+      nextActions TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS meta (
@@ -177,8 +195,8 @@ const DB = (() => {
     db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
     db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
 
-    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes) VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31','["urgent","reviewed"]',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.')`);
-    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes) VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31','["recurring"]',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31','["urgent","reviewed"]',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.','Aurora Corp')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31','["recurring"]',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.','Aurora Corp')`);
 
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Dashboard UI development',24,2500)`);
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Sprint planning & code review',8,2500)`);
@@ -188,6 +206,25 @@ const DB = (() => {
     db.run(`INSERT INTO meta VALUES ('taskSeq','13')`);
     db.run(`INSERT INTO meta VALUES ('billSeq','2')`);
 
+    db.run('COMMIT');
+  }
+
+  function seedOneOnOnes() {
+    const stmt = db.prepare('SELECT COUNT(*) as cnt FROM one_on_ones');
+    stmt.step();
+    const row = stmt.getAsObject();
+    stmt.free();
+    if (row.cnt > 0) return;
+
+    db.run('BEGIN TRANSACTION');
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-1','mem-1','2026-08-12',4,'Calm under the pricing-page crunch. Pushed back once, then delivered.',4,'High-Level vs Low-Level split is clean; LLD tickets actually match his depth.',4,'Called the Safari risk two days out and still landed TSK-005.',5,'Unprompted review of Entity 101 before anyone asked.','["ownership","quality"]','Keep him on Bill life Cycle internals next cycle.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-2','mem-2','2026-08-18',3,'Friendly, but goes quiet when estimates slip.',3,'Prototype work is strong; production wiring still needs a co-pilot.',2,'Webhook retries sat in todo past the date with no ping.',3,'Picked up CLI dry-run without being asked.','["initiative","silence"]','Pair on deadline signalling. One mid-week check-in, not a status pile.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-3','mem-3','2026-08-20',5,'Sets the temperature in reviews without making it personal.',5,'HLD is his home turf — architecture notes are the real artifact.',4,'System 101 is still open but he flagged it early.',4,'Wrote the technical doc line items that became INV-002.','["communication","mentoring"]','Let him own the next verbal-to-invoice translation with Aurora.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-4','mem-4','2026-08-22',4,'Quiet, exact, does not oversell.',4,'Verification work is the nature of the role — he stays in that lane.',5,'Verification to the end closed on the date. No drama.',3,'Could use one extra: talking findings out loud so others can act.','["quality"]','Invite him into the standup readout, not just the ticket.')`);
+    db.run(`UPDATE members SET stats='{"serious":2,"procrastinations":0,"dealings":1,"extra":2}' WHERE id='mem-1'`);
+    db.run(`UPDATE members SET stats='{"serious":0,"procrastinations":2,"dealings":0,"extra":1}' WHERE id='mem-2'`);
+    db.run(`UPDATE members SET stats='{"serious":1,"procrastinations":0,"dealings":2,"extra":1}' WHERE id='mem-3'`);
+    db.run(`UPDATE members SET stats='{"serious":1,"procrastinations":0,"dealings":0,"extra":0}' WHERE id='mem-4'`);
     db.run('COMMIT');
   }
 
@@ -258,6 +295,9 @@ const DB = (() => {
         db = new SQL.Database();
       }
 
+      // SQLite only enforces foreign keys when enabled for this connection.
+      db.run('PRAGMA foreign_keys = ON');
+
       // Ensure schema exists
       db.run(SCHEMA);
 
@@ -283,20 +323,23 @@ const DB = (() => {
         }
       }catch(e){ console.warn('Migration check for tasks.meta failed', e); }
 
-      // Migration: add `avatar` column to members if it doesn't exist (for existing DBs)
-      try{
-        const pragmaMembers = db.exec("PRAGMA table_info('members')");
-        if(pragmaMembers && pragmaMembers.length && pragmaMembers[0].values){
-          const cols = pragmaMembers[0].values.map(v => v[1]);
-          if(!cols.includes('avatar')){
-            db.run("ALTER TABLE members ADD COLUMN avatar TEXT DEFAULT ''");
+      function ensureColumn(table, col, ddl){
+        try{
+          const pragma = db.exec(`PRAGMA table_info('${table}')`);
+          if(pragma && pragma.length && pragma[0].values){
+            const cols = pragma[0].values.map(v => v[1]);
+            if(!cols.includes(col)) db.run(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
           }
-        }
-      }catch(e){ console.warn('Migration check for members.avatar failed', e); }
+        }catch(e){ console.warn(`Migration check for ${table}.${col} failed`, e); }
+      }
+      ensureColumn('members', 'avatar', "avatar TEXT DEFAULT ''");
+      ensureColumn('members', 'stats', "stats TEXT DEFAULT '{}'");
+      ensureColumn('bills', 'party', "party TEXT DEFAULT ''");
 
       // Seed if empty
       seedDefaults();
       seedAgreements();
+      seedOneOnOnes();
       // Detect and fix any corrupted task rows from prior schema changes
       detectAndFixCorruptTasks();
 
@@ -399,6 +442,15 @@ const DB = (() => {
   /* -- State restoration -- */
   function restoreState(state) {
     state.members = queryAll('SELECT * FROM members ORDER BY id');
+    state.members.forEach(m => {
+      try{ m.stats = m.stats ? JSON.parse(m.stats) : {}; }catch(e){ m.stats = {}; }
+      m.stats = {
+        serious: Number(m.stats.serious) || 0,
+        procrastinations: Number(m.stats.procrastinations) || 0,
+        dealings: Number(m.stats.dealings) || 0,
+        extra: Number(m.stats.extra) || 0,
+      };
+    });
     state.projects = queryAll('SELECT * FROM projects ORDER BY id');
     state.tasks = queryAll('SELECT * FROM tasks ORDER BY id');
     // Ensure `meta` is parsed into an object for each task
@@ -415,13 +467,20 @@ const DB = (() => {
     });
     state.bills = queryAll('SELECT * FROM bills ORDER BY id');
     state.agreements = queryAll('SELECT * FROM agreements ORDER BY id');
+    state.oneOnOnes = queryAll('SELECT * FROM one_on_ones ORDER BY date DESC, id DESC');
 
     // Restore line items into bills
     for (const bill of state.bills) {
-      bill.lineItems = queryAll('SELECT * FROM line_items WHERE billId=? ORDER BY id', [bill.id]);
+      bill.lineItems = queryAll('SELECT * FROM line_items WHERE billId=? ORDER BY id', [bill.id]) || [];
+      bill.party = bill.party || '';
       try{
         bill.flags = bill.flags ? JSON.parse(bill.flags) : [];
       }catch(e){ bill.flags = []; }
+      if(!Array.isArray(bill.flags)) bill.flags = [];
+    }
+
+    if(window.normalizeOneOnOne){
+      state.oneOnOnes = state.oneOnOnes.map(row => window.normalizeOneOnOne(row));
     }
 
     state.taskSeq = parseInt(getMeta('taskSeq', '13'));
