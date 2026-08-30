@@ -217,15 +217,25 @@ const DB = (() => {
     if (row.cnt > 0) return;
 
     db.run('BEGIN TRANSACTION');
-    db.run(`INSERT INTO one_on_ones VALUES ('o3-1','mem-1','2026-08-12',4,'Calm under the pricing-page crunch. Pushed back once, then delivered.',4,'High-Level vs Low-Level split is clean; LLD tickets actually match his depth.',4,'Called the Safari risk two days out and still landed TSK-005.',5,'Unprompted review of Entity 101 before anyone asked.','["ownership","quality"]','Keep him on Bill life Cycle internals next cycle.')`);
-    db.run(`INSERT INTO one_on_ones VALUES ('o3-2','mem-2','2026-08-18',3,'Friendly, but goes quiet when estimates slip.',3,'Prototype work is strong; production wiring still needs a co-pilot.',2,'Webhook retries sat in todo past the date with no ping.',3,'Picked up CLI dry-run without being asked.','["initiative","silence"]','Pair on deadline signalling. One mid-week check-in, not a status pile.')`);
-    db.run(`INSERT INTO one_on_ones VALUES ('o3-3','mem-3','2026-08-20',5,'Sets the temperature in reviews without making it personal.',5,'HLD is his home turf — architecture notes are the real artifact.',4,'System 101 is still open but he flagged it early.',4,'Wrote the technical doc line items that became INV-002.','["communication","mentoring"]','Let him own the next verbal-to-invoice translation with Aurora.')`);
-    db.run(`INSERT INTO one_on_ones VALUES ('o3-4','mem-4','2026-08-22',4,'Quiet, exact, does not oversell.',4,'Verification work is the nature of the role — he stays in that lane.',5,'Verification to the end closed on the date. No drama.',3,'Could use one extra: talking findings out loud so others can act.','["quality"]','Invite him into the standup readout, not just the ticket.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-1','mem-1','2026-08-12',4,'Shared progress and raised a trade-off before it affected the planned work.',4,'Implementation notes and review comments made the handoff easier to follow.',4,'Flagged the remaining risk early and confirmed the revised completion plan.',5,'Reviewed a related area and documented a useful follow-up.','["ownership","quality"]','Write the next delivery risk in the ticket before the weekly check-in.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-2','mem-2','2026-08-18',3,'Contributions were useful, but the timeline change was not communicated early enough.',3,'The initial implementation was clear; the production follow-through needs a more explicit plan.',2,'A planned task stayed open after its date without an updated estimate or blocker note.',3,'Took on a small follow-up without being asked.','["initiative","scope-creep"]','Add a midpoint update for work that may miss its planned date.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-3','mem-3','2026-08-20',5,'Kept the discussion constructive and translated decisions into clear next steps.',5,'The technical notes gave the team a usable decision record.',4,'The remaining work was flagged early, with a clear completion plan.',4,'Helped turn the work summary into a clear client-facing update.','["communication","mentoring"]','Use the same decision-record format for the next cross-team change.')`);
+    db.run(`INSERT INTO one_on_ones VALUES ('o3-4','mem-4','2026-08-22',4,'Updates were concise and based on verification evidence.',4,'The validation work was thorough and aligned with the assigned scope.',5,'The planned verification was completed on time with no unresolved handoff.',3,'A short written summary would help others act on the findings faster.','["quality"]','Bring one verification finding to the next team readout.')`);
     db.run(`UPDATE members SET stats='{"serious":2,"procrastinations":0,"dealings":1,"extra":2}' WHERE id='mem-1'`);
     db.run(`UPDATE members SET stats='{"serious":0,"procrastinations":2,"dealings":0,"extra":1}' WHERE id='mem-2'`);
     db.run(`UPDATE members SET stats='{"serious":1,"procrastinations":0,"dealings":2,"extra":1}' WHERE id='mem-3'`);
     db.run(`UPDATE members SET stats='{"serious":1,"procrastinations":0,"dealings":0,"extra":0}' WHERE id='mem-4'`);
     db.run('COMMIT');
+  }
+
+  // Refresh only the bundled sample records. User-created check-ins are untouched.
+  function refreshSampleCheckInCopy() {
+    if(getMeta('checkInCopyVersion', '') === '2') return;
+    db.run("UPDATE one_on_ones SET behaviourNote='Shared progress and raised a trade-off before it affected the planned work.', natureNote='Implementation notes and review comments made the handoff easier to follow.', deadlineNote='Flagged the remaining risk early and confirmed the revised completion plan.', extraNote='Reviewed a related area and documented a useful follow-up.', nextActions='Write the next delivery risk in the ticket before the weekly check-in.' WHERE id='o3-1'");
+    db.run("UPDATE one_on_ones SET behaviourNote='Contributions were useful, but the timeline change was not communicated early enough.', natureNote='The initial implementation was clear; the production follow-through needs a more explicit plan.', deadlineNote='A planned task stayed open after its date without an updated estimate or blocker note.', extraNote='Took on a small follow-up without being asked.', extraTags='[\"initiative\",\"scope-creep\"]', nextActions='Add a midpoint update for work that may miss its planned date.' WHERE id='o3-2'");
+    db.run("UPDATE one_on_ones SET behaviourNote='Kept the discussion constructive and translated decisions into clear next steps.', natureNote='The technical notes gave the team a usable decision record.', deadlineNote='The remaining work was flagged early, with a clear completion plan.', extraNote='Helped turn the work summary into a clear client-facing update.', nextActions='Use the same decision-record format for the next cross-team change.' WHERE id='o3-3'");
+    db.run("UPDATE one_on_ones SET behaviourNote='Updates were concise and based on verification evidence.', natureNote='The validation work was thorough and aligned with the assigned scope.', deadlineNote='The planned verification was completed on time with no unresolved handoff.', extraNote='A short written summary would help others act on the findings faster.', nextActions='Bring one verification finding to the next team readout.' WHERE id='o3-4'");
+    setMeta('checkInCopyVersion', '2');
   }
 
   /* -- Seed demo agreements (idempotent; separate guard so existing DBs get them too) -- */
@@ -340,6 +350,7 @@ const DB = (() => {
       seedDefaults();
       seedAgreements();
       seedOneOnOnes();
+      refreshSampleCheckInCopy();
       // Detect and fix any corrupted task rows from prior schema changes
       detectAndFixCorruptTasks();
 

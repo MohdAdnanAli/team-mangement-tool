@@ -1,26 +1,26 @@
 const REP_KEYS = [
-  { key:'serious', label:'Serious', hint:'Follow-through, ownership, no-drama delivery', icon:'◆' },
-  { key:'procrastinations', label:'Procrastinations', hint:'Late starts, slipped due dates, parked work', icon:'◷' },
-  { key:'dealings', label:'Dealings', hint:'How they handle money, promises, and agreements', icon:'⇄' },
-  { key:'extra', label:'Extra', hint:'Stretch work, unblocking others, unprompted quality', icon:'★' },
+  { key:'serious', label:'Reliability', hint:'Follow-through, clear ownership, and dependable delivery', icon:'◆' },
+  { key:'procrastinations', label:'Delivery risks', hint:'Blocked work, late starts, or commitments that need attention', icon:'◷' },
+  { key:'dealings', label:'Collaboration', hint:'Clear communication and dependable work with others', icon:'⇄' },
+  { key:'extra', label:'Contributions', hint:'Initiative, unblocking, mentoring, and quality improvements', icon:'★' },
 ];
 
 const O3_DIMS = [
-  { key:'behaviour', label:'Behaviour', hint:'Tone in the room, reliability, how they treat people' },
-  { key:'natureOfWork', label:'Nature of work', hint:'Craft, depth, whether the work actually matches the role' },
-  { key:'deadlineHandling', label:'Deadline handling', hint:'How they see a date coming and what they do about it' },
-  { key:'extra', label:'Extra', hint:'Anything that does not fit the other three — call it out' },
+  { key:'behaviour', label:'Working approach', hint:'Communication, ownership, and how work moves forward' },
+  { key:'natureOfWork', label:'Work quality & fit', hint:'Quality, craft, and whether the work fits the role' },
+  { key:'deadlineHandling', label:'Delivery confidence', hint:'Deadline awareness, risk signalling, and follow-through' },
+  { key:'extra', label:'Additional contribution', hint:'Useful work beyond the core task or role' },
 ];
 
 const EXTRA_TAGS = [
-  { key:'ownership', label:'Ownership' },
-  { key:'communication', label:'Communication' },
+  { key:'ownership', label:'Clear ownership' },
+  { key:'communication', label:'Clear updates' },
   { key:'initiative', label:'Initiative' },
   { key:'mentoring', label:'Mentoring' },
   { key:'unblocking', label:'Unblocking' },
-  { key:'quality', label:'Quality bar' },
-  { key:'scope-creep', label:'Scope creep' },
-  { key:'silence', label:'Went quiet' },
+  { key:'quality', label:'Quality improvement' },
+  { key:'scope-creep', label:'Scope risk' },
+  { key:'silence', label:'Support needed' },
 ];
 
 function emptyStats(){
@@ -98,10 +98,10 @@ function rewardPoints(counters){
 }
 
 function rewardGrade(points){
-  if(points >= 90) return { label:'Exemplary', cls:'success', band:'A' };
-  if(points >= 60) return { label:'Solid', cls:'teal', band:'B' };
-  if(points >= 30) return { label:'Watch', cls:'amber', band:'C' };
-  return { label:'At risk', cls:'danger', band:'D' };
+  if(points >= 90) return { label:'Strong momentum', cls:'success', band:'A' };
+  if(points >= 60) return { label:'Steady', cls:'teal', band:'B' };
+  if(points >= 30) return { label:'Building', cls:'amber', band:'C' };
+  return { label:'Needs support', cls:'danger', band:'D' };
 }
 
 function persistMemberStats(member){
@@ -237,18 +237,18 @@ function openOneOnOneModal(existing, memberId){
         </div>
         ${scorePips(key, dim.score)}
       </div>
-      <textarea id="o3-note-${key}" rows="3" placeholder="What you actually saw — not the vibe, the evidence.">${window.escapeHTML(dim.note || '')}</textarea>
+      <textarea id="o3-note-${key}" rows="3" placeholder="Add a short work-based example or observation.">${window.escapeHTML(dim.note || '')}</textarea>
     </div>`;
 
   window.openModal(`
-    <div class="modal-title">${existing ? 'Edit 1:1' : 'Log a 1:1'}</div>
+    <div class="modal-title">${existing ? 'Edit check-in' : 'Log a check-in'}</div>
     <div class="row2">
       <div class="field"><label>Teammate</label><select id="o3Member">${memberOptions}</select></div>
       <div class="field"><label>Date</label><input id="o3Date" type="date" value="${data.date}"></div>
     </div>
     ${O3_DIMS.map(d => dimBlock(d.key, d.label, d.hint, data[d.key])).join('')}
     <div class="field">
-      <label>Extra tags</label>
+      <label>Focus tags</label>
       <div class="color-swatches" id="o3Tags">
         ${EXTRA_TAGS.map(t => {
           const on = (data.extra.tags || []).includes(t.key);
@@ -259,11 +259,11 @@ function openOneOnOneModal(existing, memberId){
         }).join('')}
       </div>
     </div>
-    <div class="field"><label>Next actions</label><textarea id="o3Next" rows="2" placeholder="One or two concrete moves before the next 1:1.">${window.escapeHTML(data.nextActions || '')}</textarea></div>
-    <div class="o3-apply">Scores automatically inform the reputation signals; the four counters can still be adjusted manually from the dossier.</div>
+    <div class="field"><label>Next actions</label><textarea id="o3Next" rows="2" placeholder="Agree one or two clear actions for the next check-in.">${window.escapeHTML(data.nextActions || '')}</textarea></div>
+    <div class="o3-apply">Scores summarise work signals over time. Keep notes specific and use manual adjustments only when context needs it.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
-      <button class="btn btn-primary" id="saveO3Btn">${existing ? 'Save 1:1' : 'Log 1:1'}</button>
+      <button class="btn btn-primary" id="saveO3Btn">${existing ? 'Save check-in' : 'Log check-in'}</button>
     </div>
   `);
 
@@ -311,7 +311,7 @@ function openOneOnOneModal(existing, memberId){
     if(window.renderNav) window.renderNav();
     if(window.renderTicker) window.renderTicker();
     if(window.render) window.render();
-    window.toast(existing ? '1:1 updated' : '1:1 logged');
+    window.toast(existing ? 'Check-in updated' : 'Check-in logged');
   });
 }
 Object.assign(window,{REP_KEYS,O3_DIMS,EXTRA_TAGS,emptyStats,normalizeStats,memberSignals,memberCounters,rewardPoints,rewardGrade,persistMemberStats,bumpCounter,emptyOneOnOne,normalizeOneOnOne,oneOnOneAverage,flattenOneOnOne,saveOneOnOne,removeOneOnOne,openOneOnOneModal});

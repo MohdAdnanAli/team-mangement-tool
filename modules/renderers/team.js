@@ -5,8 +5,6 @@ function _safeOpen(name, evtName, arg){
     window.dispatchEvent(new CustomEvent(evtName, { detail: arg }));
   }
 }
-window.renderTeam = renderTeam;
-
 function counterStrip(m){
   const c = window.memberCounters(m);
   const pts = window.rewardPoints(c);
@@ -29,7 +27,6 @@ function counterStrip(m){
       </div>
     </div>`;
 }
-
 function renderTeam(){
   const view = document.getElementById('view');
   const members = window.state.members || [];
@@ -37,10 +34,10 @@ function renderTeam(){
     <div class="view-head">
       <div>
         <div class="view-title">Team</div>
-        <div class="view-sub">${members.length} MEMBERS · REPUTATION &amp; REWARDS</div>
+        <div class="view-sub">${members.length} MEMBERS · WORK SIGNALS &amp; CHECK-INS</div>
       </div>
       <div class="view-actions">
-        <button class="btn" id="openO3View">1:1 board →</button>
+        <button class="btn" id="openO3View">Check-ins →</button>
         <button class="btn btn-primary" id="addMemberBtn">+ Add teammate</button>
       </div>
     </div>
@@ -77,8 +74,8 @@ function renderTeam(){
               </div>`).join('')}
           </div>
           <div class="member-foot-actions">
-            <button class="btn btn-sm" data-log-o3="${m.id}">Log 1:1</button>
-            <button class="btn btn-sm btn-primary" data-open-o3="${m.id}">Open dossier</button>
+            <button class="btn btn-sm" data-log-o3="${m.id}">Log check-in</button>
+            <button class="btn btn-sm btn-primary" data-open-o3="${m.id}">Open check-ins</button>
           </div>
         </div>`;
       }).join('') || '<div class="empty">No teammates yet</div>'}
@@ -129,3 +126,4 @@ function renderTeam(){
     });
   });
 }
+window.renderTeam = renderTeam;

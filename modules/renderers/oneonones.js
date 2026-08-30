@@ -5,14 +5,11 @@ function _safeOpen(name, evtName, arg){
     window.dispatchEvent(new CustomEvent(evtName, { detail: arg }));
   }
 }
-window.renderOneOnOnes = renderOneOnOnes;
-
 function dimNote(dim){
   if(!dim) return '';
   const note = window.escapeHTML(dim.note || 'No note logged.');
   return `<div class="o3-scoreline"><span class="o3-score">${dim.score}/5</span><span>${note}</span></div>`;
 }
-
 function renderOneOnOnes(){
   const view = document.getElementById('view');
   const members = window.state.members || [];
@@ -22,7 +19,7 @@ function renderOneOnOnes(){
   const allSessions = window.state.oneOnOnes || [];
 
   if(!members.length){
-    view.innerHTML = `<div class="empty">Add a teammate first — 1:1s live on people, not on air.</div>`;
+    view.innerHTML = `<div class="empty">Add a teammate first — check-ins are recorded against a person.</div>`;
     return;
   }
 
@@ -34,11 +31,11 @@ function renderOneOnOnes(){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <div class="view-title">One on one</div>
-        <div class="view-sub">BEHAVIOUR · NATURE OF WORK · DEADLINE HANDLING · EXTRA</div>
+        <div class="view-title">Check-ins</div>
+        <div class="view-sub">WORKING APPROACH · QUALITY · DELIVERY · CONTRIBUTIONS</div>
       </div>
       <div class="view-actions">
-        <button class="btn btn-primary" id="logO3Btn">+ Log 1:1</button>
+        <button class="btn btn-primary" id="logO3Btn">+ Log check-in</button>
       </div>
     </div>
 
@@ -51,7 +48,7 @@ function renderOneOnOnes(){
         return `
           <button class="o3-person ${person.id===focusId?'active':''}" data-focus="${person.id}">
             <span class="o3-person-name">${window.escapeHTML(person.name)}</span>
-            <span class="o3-person-meta">${n} 1:1s · ${p} pts</span>
+            <span class="o3-person-meta">${n} check-ins · ${p} pts</span>
             <span class="status-pill ${g.cls}">${g.label}</span>
           </button>`;
       }).join('')}
@@ -66,7 +63,7 @@ function renderOneOnOnes(){
         </div>
         <div class="rep-reward">
           <span class="rep-points">${pts}</span>
-          <span class="rep-unit">reward pts</span>
+          <span class="rep-unit">signal pts</span>
           <span class="status-pill ${grade.cls}">${grade.label}</span>
         </div>
       </div>
@@ -77,7 +74,7 @@ function renderOneOnOnes(){
             <div class="rep-counter-label">${k.icon} ${k.label}</div>
             <div class="rep-counter-val">${counters[k.key]}</div>
             <div class="rep-counter-split">${k.hint}</div>
-            <div class="rep-counter-split">${counters.manual[k.key]} logged · ${counters.auto[k.key]} from tickets / bills / 1:1s</div>
+            <div class="rep-counter-split">${counters.manual[k.key]} adjusted · ${counters.auto[k.key]} from work signals</div>
             <div class="rep-stepper" data-mem="${m.id}" data-key="${k.key}">
               <button type="button" data-bump="-1">−</button>
               <span>adjust</span>
@@ -92,7 +89,7 @@ function renderOneOnOnes(){
         <div class="o3-signal"><b>${signals.meta.paid || 0}</b> bills paid</div>
         <div class="o3-signal"><b>${signals.meta.overdueBills || 0}</b> bills late</div>
         <div class="o3-signal"><b>${signals.meta.activeHrs || 0}h</b> still open</div>
-        <div class="o3-signal"><b>${sessions.length}</b> 1:1s on file</div>
+        <div class="o3-signal"><b>${sessions.length}</b> check-ins logged</div>
       </div>
 
       <div class="o3-timeline">
@@ -105,7 +102,7 @@ function renderOneOnOnes(){
               <div class="o3-card-head">
                 <div>
                   <div class="o3-card-date">${window.fmtDate(e.date)}</div>
-                  <div class="o3-card-avg">session avg ${avg} / 5</div>
+                  <div class="o3-card-avg">check-in signal ${avg} / 5</div>
                 </div>
                 <div class="card-actions">
                   <button class="icon-btn" data-edit-o3="${e.id}" title="Edit">✎</button>
@@ -113,14 +110,14 @@ function renderOneOnOnes(){
                 </div>
               </div>
               <div class="o3-grid">
-                <div><div class="o3-dim-label">Behaviour</div>${dimNote(e.behaviour)}</div>
-                <div><div class="o3-dim-label">Nature of work</div>${dimNote(e.natureOfWork)}</div>
-                <div><div class="o3-dim-label">Deadline handling</div>${dimNote(e.deadlineHandling)}</div>
-                <div><div class="o3-dim-label">Extra</div>${dimNote(e.extra)}${tags ? `<div class="invoice-flags" style="margin:8px 0 0;">${tags}</div>` : ''}</div>
+                <div><div class="o3-dim-label">Working approach</div>${dimNote(e.behaviour)}</div>
+                <div><div class="o3-dim-label">Work quality &amp; fit</div>${dimNote(e.natureOfWork)}</div>
+                <div><div class="o3-dim-label">Delivery confidence</div>${dimNote(e.deadlineHandling)}</div>
+                <div><div class="o3-dim-label">Additional contribution</div>${dimNote(e.extra)}${tags ? `<div class="invoice-flags" style="margin:8px 0 0;">${tags}</div>` : ''}</div>
               </div>
               ${e.nextActions ? `<div class="invoice-notes"><b>Next:</b> ${window.escapeHTML(e.nextActions)}</div>` : ''}
             </article>`;
-        }).join('') : `<div class="empty">No 1:1s for ${window.escapeHTML(m.name)} yet — log the first one while it is still specific.</div>`}
+        }).join('') : `<div class="empty">No check-ins for ${window.escapeHTML(m.name)} yet — capture a specific work example to start.</div>`}
       </div>
     </div>` : ''}
   `;
@@ -148,9 +145,10 @@ function renderOneOnOnes(){
   });
   document.querySelectorAll('[data-del-o3]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      if(!window.confirm('Delete this 1:1? Its score will no longer inform the reputation signals.')) return;
+      if(!window.confirm('Delete this check-in? Its score will no longer inform the work signals.')) return;
       window.removeOneOnOne(btn.dataset.delO3);
       window.renderNav(); window.renderTicker(); renderOneOnOnes();
     });
   });
 }
+window.renderOneOnOnes = renderOneOnOnes;

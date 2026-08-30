@@ -175,7 +175,7 @@ const NAV = [
   {key:'workload', icon:'▮', label:'Workload'},
   {key:'projects', icon:'◫', label:'Projects'},
   {key:'team', icon:'◍', label:'Team'},
-  {key:'oneonones', icon:'◎', label:'One on ones'},
+  {key:'oneonones', icon:'◎', label:'Check-ins'},
   {key:'bills', icon:'💰', label:'Bills'},
   {key:'agreements', icon:'✎', label:'Agreements'},
 ];
