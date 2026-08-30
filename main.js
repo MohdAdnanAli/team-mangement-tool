@@ -553,7 +553,6 @@ function openBillModal(existing){
 
 /* ============================= AGREEMENTS ============================= */
 /* Agreements renderer moved to modules/renderers/agreements.js */
-}
 
 function openAgreementModal(){
   openModal(`
@@ -701,7 +700,7 @@ function openMemberModal(existing){
       DB.insert('members', mem);
       toast('Teammate added');
     }
-    closeModal(); renderNav(); renderTicker(); renderTeam();
+    closeModal(); renderNav(); renderTicker(); window.renderTeam();
   });
 }
 
