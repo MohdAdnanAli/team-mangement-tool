@@ -12,7 +12,10 @@
   function toAgreement(row){ return { ...row, dateAgreed:row.date_agreed || '' }; }
   function toCheckin(row){ return window.normalizeOneOnOne({ ...row, memberId:row.member_id, behaviourScore:row.behaviour_score, behaviourNote:row.behaviour_note, natureScore:row.nature_score, natureNote:row.nature_note, deadlineScore:row.deadline_score, deadlineNote:row.deadline_note, extraScore:row.extra_score, extraNote:row.extra_note, extraTags:row.extra_tags, nextActions:row.next_actions }); }
 
-  async function loadRemoteState(state){
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const isFutureJwtError = error => error && error.code === 'PGRST303' && /issued at future/i.test(error.message || '');
+
+  async function loadRemoteStateOnce(state){
     const db = client(), ws = workspaceId();
     const [members, projects, tasks, bills, agreements, checkins] = await Promise.all([
       db.from('members').select('*').eq('workspace_id', ws).order('id'),
@@ -39,6 +42,21 @@
     state.billSeq = Math.max(0,...state.bills.map(b => Number(String(b.billNumber).replace(/\D/g,'')) || 0));
     window.DATA_MODE = 'supabase';
     return true;
+  }
+
+  async function loadRemoteState(state){
+    // Supabase can briefly reject a freshly issued token while its API clock
+    // catches up. Retry only that documented transient condition.
+    let lastError;
+    for(const delay of [0, 1200, 2500, 5000]){
+      if(delay) await wait(delay);
+      try { return await loadRemoteStateOnce(state); }
+      catch(error){
+        lastError = error;
+        if(!isFutureJwtError(error)) throw error;
+      }
+    }
+    throw lastError;
   }
 
   function localRows(state){
