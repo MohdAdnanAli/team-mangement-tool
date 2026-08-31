@@ -170,40 +170,44 @@ const DB = (() => {
 
     db.run('BEGIN TRANSACTION');
 
-    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-1','Abhijeet','Low-Level Design',38,'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80')`);
-    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-2','Pandey Ji','Model and protype',35,'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80')`);
-    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-3','Ashutosh Ji','High-Level Design',32,'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80')`);
-    db.run(`INSERT INTO members (id, name, role, capacity, avatar) VALUES ('mem-4','Jaiswal','Veriification team',30,'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80')`);
+    const members = [
+      ['mem-1','Abhijeet','Low-Level Design',40,'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80'],
+      ['mem-2','Pandey','Data Model & Prototyping',35,'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80'],
+      ['mem-3','Ashutosh','Senior Developer — System Design Lead',36,'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80'],
+      ['mem-4','Jaiswal','Verification & QA',30,'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80'],
+      ['mem-5','Awara Singh','Frontend & Product UI',34,'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=240&q=80'],
+      ['mem-6','Adnan','Product & Compliance Lead',20,'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=240&q=80'],
+      ['mem-7','Shivakashi','Unassigned — Clearance Pending',8,'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=240&q=80'],
+    ];
+    const projects = [
+      ['proj-1','Core Deal Pipeline','#5B4FCF'], ['proj-2','OTP & Sealing','#6D5DF6'],
+      ['proj-3','Bill Generation & Invoicing','#F2B84B'], ['proj-4','Distribution & Notifications','#5FBF7A'],
+      ['proj-5','Seller & Buyer UI','#8AA4FF'], ['proj-6','Security & Compliance','#E8656A'],
+    ];
+    const tasks = [
+      ['TSK-001','Batch buyer-leg order creation','proj-1','mem-1','done','high','2026-07-25',10], ['TSK-002','Redis TTL + rate limiting on public SO routes','proj-1','mem-1','done','high','2026-07-28',8], ['TSK-003','Seller-initiated resend-link endpoint','proj-1','mem-1','todo','med','2026-09-05',6],
+      ['TSK-004','Register SMS templates with DLT aggregator','proj-2','mem-6','progress','high','2026-09-10',4], ['TSK-005','Build OTP request/verify service','proj-2','mem-4','todo','high','2026-09-15',14], ['TSK-006','Lock-at-3-attempts + unlock flow','proj-2','mem-4','todo','med','2026-09-18',6],
+      ['TSK-007','Build M7 bill generation service','proj-3','mem-1','todo','high','2026-09-20',16], ['TSK-008','DB-enforce sequential invoice numbering','proj-3','mem-2','todo','high','2026-09-12',8], ['TSK-009','Confirm GST IRN threshold applicability','proj-3','mem-6','todo','high','2026-09-08',3],
+      ['TSK-010','Build NotificationService (SES + MSG91)','proj-4','mem-1','progress','high','2026-09-06',12], ['TSK-011','Wire SO-link auto-send on generate/resend','proj-4','mem-1','progress','high','2026-09-04',6],
+      ['TSK-012','Seller dashboard shell (Next.js)','proj-5','mem-5','todo','high','2026-09-14',20], ['TSK-013','Buyer public verification pages','proj-5','mem-5','todo','high','2026-09-16',18], ['TSK-014','Wire Seller UI to backend APIs','proj-5','mem-1','todo','high','2026-09-22',10],
+      ['TSK-015','DPDP consent flow & legal review','proj-6','mem-6','todo','high','2026-09-10',8], ['TSK-016','Encryption-at-rest for GSTIN/phone/payment','proj-6','mem-3','todo','high','2026-09-12',10], ['TSK-017','Set budget ceiling & cost-alert thresholds','proj-6','mem-3','todo','med','2026-09-09',4], ['TSK-018','Architecture review & final sign-off across all modules','proj-6','mem-3','progress','high','2026-12-01',20], ['TSK-019','Complete onboarding: marketing, legal & bank clearance','proj-6','mem-7','todo','high','2026-09-30',2], ['TSK-020','Draft storage-scaling design (M14)','proj-1','mem-2','todo','low','2026-11-01',6], ['TSK-021','E2E regression suite for OTP + seal flow','proj-2','mem-4','todo','med','2026-09-20',10],
+    ];
+    const memberStmt = db.prepare('INSERT INTO members (id,name,role,capacity,avatar) VALUES (?,?,?,?,?)');
+    members.forEach(row => memberStmt.run(row)); memberStmt.free();
+    const projectStmt = db.prepare('INSERT INTO projects (id,name,color) VALUES (?,?,?)');
+    projects.forEach(row => projectStmt.run(row)); projectStmt.free();
+    const taskStmt = db.prepare('INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES (?,?,?,?,?,?,?,?,?)');
+    tasks.forEach(row => taskStmt.run([...row, '{}'])); taskStmt.free();
 
-    db.run(`INSERT INTO projects VALUES ('proj-1','Dashboard','#4FD1C5')`);
-    db.run(`INSERT INTO projects VALUES ('proj-2','Profile','#F2B84B')`);
-    db.run(`INSERT INTO projects VALUES ('proj-3','Sub IsOrNot','#8AA4FF')`);
-    db.run(`INSERT INTO projects VALUES ('proj-4','Bill life Cycle','#E8656A')`);
-    db.run(`INSERT INTO projects VALUES ('proj-5','otp and mail services','#5FBF7A')`);
-    db.run(`INSERT INTO projects VALUES ('proj-6','Entity Relation and clean design','#C792EA')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31','["urgent","reviewed"]',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.','Kranti')`);
+    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31','["recurring"]',18,'2026-08-02','2026-08-16','draft','Draft — pending approval.','Kranti')`);
 
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-001','Ship new pricing page hero','proj-1','mem-1','progress','high','2026-08-02',8,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-002','Wire up billing webhook retries','proj-1','mem-2','todo','high','2026-08-05',12,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-003','Redesign onboarding checklist UI','proj-2','mem-3','review','med','2026-08-01',6,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-004','Write regression suite for auth','proj-3','mem-4','progress','med','2026-08-08',10,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-005','Fix Safari flex bug on dashboard','proj-1','mem-1','done','low','2026-07-22',3,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-006','Customer migration runbook','proj-2','mem-2','todo','med','2026-08-10',5,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-007','Internal CLI: add dry-run flag','proj-3','mem-2','done','low','2026-07-20',4,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-008','Design system: audit spacing tokens','proj-3','mem-3','todo','low','2026-08-14',7,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-010','Entity 101','proj-6','mem-1','todo','low','2026-10-05',6,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-011','services 101','proj-4','mem-2','progress','med','2026-10-05',8,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
-    db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
-
-    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-1','mem-1','INV-001','2026-07-01','2026-07-31','["urgent","reviewed"]',18,'2026-08-01','2026-08-15','sent','Payment via NEFT within 15 days of invoice date. Late payment attracts 2% interest per month.','Aurora Corp')`);
-    db.run(`INSERT INTO bills (id, memberId, billNumber, periodStart, periodEnd, flags, taxRate, issueDate, dueDate, status, notes, party) VALUES ('bill-2','mem-3','INV-002','2026-07-01','2026-07-31','["recurring"]',18,'2026-08-02','2026-08-16','draft','Draft — pending approval from the client.','Aurora Corp')`);
-
-    db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Dashboard UI development',24,2500)`);
+    db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Core deal pipeline development',24,2500)`);
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-1','Sprint planning & code review',8,2500)`);
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-2','High-level architecture review',10,3000)`);
     db.run(`INSERT INTO line_items (billId,description,hours,rate) VALUES ('bill-2','Technical documentation',6,2500)`);
 
-    db.run(`INSERT INTO meta VALUES ('taskSeq','13')`);
+    db.run(`INSERT INTO meta VALUES ('taskSeq','21')`);
     db.run(`INSERT INTO meta VALUES ('billSeq','2')`);
 
     db.run('COMMIT');
@@ -228,6 +232,31 @@ const DB = (() => {
     db.run('COMMIT');
   }
 
+  // Replace only the untouched, original mock dataset. Once a user has added or
+  // changed records, its shape no longer matches and it is never reset here.
+  function replaceLegacyMockDataset() {
+    const legacy = queryOne(`
+      SELECT
+        (SELECT COUNT(*) FROM members) AS memberCount,
+        (SELECT COUNT(*) FROM tasks) AS taskCount,
+        (SELECT COUNT(*) FROM projects) AS projectCount,
+        (SELECT COUNT(*) FROM bills) AS billCount,
+        (SELECT COUNT(*) FROM members WHERE id='mem-2' AND name='Pandey Ji') AS isLegacy
+    `);
+    if(!legacy || legacy.memberCount !== 4 || legacy.taskCount !== 12 || legacy.projectCount !== 6 || legacy.billCount !== 2 || legacy.isLegacy !== 1) return;
+
+    db.run('BEGIN TRANSACTION');
+    db.run('DELETE FROM line_items');
+    db.run('DELETE FROM one_on_ones');
+    db.run('DELETE FROM bills');
+    db.run('DELETE FROM tasks');
+    db.run('DELETE FROM agreements');
+    db.run('DELETE FROM projects');
+    db.run('DELETE FROM members');
+    db.run("DELETE FROM meta WHERE key IN ('taskSeq','billSeq','checkInCopyVersion')");
+    db.run('COMMIT');
+  }
+
   // Refresh only the bundled sample records. User-created check-ins are untouched.
   function refreshSampleCheckInCopy() {
     if(getMeta('checkInCopyVersion', '') === '2') return;
@@ -247,8 +276,8 @@ const DB = (() => {
     if (row.cnt > 0) return;
 
     db.run('BEGIN TRANSACTION');
-    db.run(`INSERT INTO agreements VALUES ('agr-1','Aurora Corp — Retainer terms','Aurora Corp (client)','₹1,20,000 / month','active','2026-06-01','Verbally agreed on the July 14 call: monthly retainer covers up to 40 hrs of dev work. Anything beyond is billed at ₹2,500/hr, invoiced separately. Retainer ends the month after either side gives written notice — no lock-in period.')`);
-    db.run(`INSERT INTO agreements VALUES ('agr-2','Karan — overtime comp','Karan Mehta (internal)','1.5x day rate','settled','2026-05-10','Agreed verbally during the QA crunch: any weekend testing gets 1.5x day rate, paid out with the next cycle. Already settled for the May sprint — no balance owed.')`);
+    db.run(`INSERT INTO agreements VALUES ('agr-1','Kranti — delivery retainer terms','Kranti (client)','₹1,20,000 / month','active','2026-06-01','Monthly retainer covers delivery work across the Core Deal Pipeline, OTP, billing, notifications, UI, and compliance streams. Work beyond the agreed scope is invoiced separately at ₹2,500/hr.')`);
+    db.run(`INSERT INTO agreements VALUES ('agr-2','Kranti — security & compliance scope','Kranti (client)','Included in delivery scope','active','2026-08-20','DPDP consent, encryption safeguards, GST IRN review, and cost-alert controls are tracked as release prerequisites before final architecture sign-off.')`);
     db.run('COMMIT');
   }
 
@@ -265,24 +294,7 @@ const DB = (() => {
       }
       const ratio = bad / rows.length;
       if(ratio > 0.4){
-        console.warn('Detected corrupted tasks seed (ratio=' + ratio + '), re-seeding tasks.');
-        db.run('BEGIN TRANSACTION');
-        db.run('DELETE FROM tasks');
-        // re-insert canonical seed rows (explicit columns include meta)
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-001','Ship new pricing page hero','proj-1','mem-1','progress','high','2026-08-02',8,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-002','Wire up billing webhook retries','proj-1','mem-2','todo','high','2026-08-05',12,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-003','Redesign onboarding checklist UI','proj-2','mem-3','review','med','2026-08-01',6,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-004','Write regression suite for auth','proj-3','mem-4','progress','med','2026-08-08',10,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-005','Fix Safari flex bug on dashboard','proj-1','mem-1','done','low','2026-07-22',3,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-006','Customer migration runbook','proj-2','mem-2','todo','med','2026-08-10',5,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-007','Internal CLI: add dry-run flag','proj-3','mem-2','done','low','2026-07-20',4,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-008','Design system: audit spacing tokens','proj-3','mem-3','todo','low','2026-08-14',7,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-010','Entity 101','proj-6','mem-1','todo','low','2026-10-05',6,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-011','services 101','proj-4','mem-2','progress','med','2026-10-05',8,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-012','system 101','proj-2','mem-3','review','low','2026-10-05',5,'{}')");
-        db.run("INSERT INTO tasks (id,title,projectId,assigneeId,status,priority,due,hours,meta) VALUES ('TSK-013','Verification to the end','proj-3','mem-4','done','med','2026-10-05',7,'{}')");
-        db.run('COMMIT');
-        scheduleSave();
+        console.warn('Detected malformed task records; they were left unchanged to avoid overwriting user data.');
       }
     }catch(e){ console.warn('Task corruption detection failed', e); }
   }
@@ -345,6 +357,10 @@ const DB = (() => {
       ensureColumn('members', 'avatar', "avatar TEXT DEFAULT ''");
       ensureColumn('members', 'stats', "stats TEXT DEFAULT '{}'");
       ensureColumn('bills', 'party', "party TEXT DEFAULT ''");
+
+      // Bring the pristine legacy mock data forward, but never overwrite a
+      // dataset that has been edited or extended by a user.
+      replaceLegacyMockDataset();
 
       // Seed if empty
       seedDefaults();
