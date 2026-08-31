@@ -1015,4 +1015,5 @@ document.getElementById('exportBtn').addEventListener('click', openExportModal);
 DB.onReady(() => {
   DB.restoreState(state);
   render();
+  if(window.startSupabaseSession) window.startSupabaseSession(state);
 });
