@@ -999,9 +999,8 @@ function openExportModal(){
     closeModal();
     toast('Building PDF…');
     try{
-      // Load PDF builder lazily (heavy). modules/pdf.js reuses section renderers already on window.
-      const mod = await import('./modules/pdf.js');
-      await mod.buildExportPDF(selected);
+      if(typeof window.buildExportPDF !== 'function') throw new Error('PDF export is unavailable');
+      await window.buildExportPDF(selected);
       toast('PDF exported');
     }catch(err){
       console.error(err);
