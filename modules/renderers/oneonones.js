@@ -31,11 +31,11 @@ function renderOneOnOnes(){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <div class="view-title">Check-ins</div>
-        <div class="view-sub">WORKING APPROACH · QUALITY · DELIVERY · CONTRIBUTIONS</div>
+        <div class="view-title">Growth check-ins</div>
+        <div class="view-sub">RECOGNISE PROGRESS · REMOVE BLOCKERS · AGREE NEXT STEPS</div>
       </div>
       <div class="view-actions">
-        <button class="btn btn-primary" id="logO3Btn">+ Log check-in</button>
+        <button class="btn btn-primary" id="logO3Btn">✨ Start check-in</button>
       </div>
     </div>
 
@@ -49,7 +49,7 @@ function renderOneOnOnes(){
           <button class="o3-person ${person.id===focusId?'active':''}" data-focus="${person.id}">
             <span class="o3-person-name">${window.escapeHTML(person.name)}</span>
             <span class="o3-person-meta">${n} check-ins · ${p} pts</span>
-            <span class="status-pill ${g.cls}">${g.label}</span>
+            <span class="status-pill ${g.cls}">${g.icon || '⭐'} ${g.label}</span>
           </button>`;
       }).join('')}
     </div>
@@ -63,8 +63,8 @@ function renderOneOnOnes(){
         </div>
         <div class="rep-reward">
           <span class="rep-points">${pts}</span>
-          <span class="rep-unit">signal pts</span>
-          <span class="status-pill ${grade.cls}">${grade.label}</span>
+          <span class="rep-unit">growth signal</span>
+          <span class="status-pill ${grade.cls}">${grade.icon || '⭐'} ${grade.label}</span>
         </div>
       </div>
 
@@ -74,10 +74,10 @@ function renderOneOnOnes(){
             <div class="rep-counter-label">${k.icon} ${k.label}</div>
             <div class="rep-counter-val">${counters[k.key]}</div>
             <div class="rep-counter-split">${k.hint}</div>
-            <div class="rep-counter-split">${counters.manual[k.key]} adjusted · ${counters.auto[k.key]} from work signals</div>
+            <div class="rep-counter-split">${counters.manual[k.key]} context note · ${counters.auto[k.key]} from work signals</div>
             <div class="rep-stepper" data-mem="${m.id}" data-key="${k.key}">
               <button type="button" data-bump="-1">−</button>
-              <span>adjust</span>
+              <span>context</span>
               <button type="button" data-bump="1">+</button>
             </div>
           </div>`).join('')}
@@ -85,9 +85,9 @@ function renderOneOnOnes(){
 
       <div class="o3-signals">
         <div class="o3-signal"><b>${signals.meta.done || 0}</b> tickets done</div>
-        <div class="o3-signal"><b>${signals.meta.overdue || 0}</b> overdue now</div>
+        <div class="o3-signal"><b>${signals.meta.overdue || 0}</b> items to unblock</div>
         <div class="o3-signal"><b>${signals.meta.paid || 0}</b> bills paid</div>
-        <div class="o3-signal"><b>${signals.meta.overdueBills || 0}</b> bills late</div>
+        <div class="o3-signal"><b>${signals.meta.overdueBills || 0}</b> billing follow-ups</div>
         <div class="o3-signal"><b>${signals.meta.activeHrs || 0}h</b> still open</div>
         <div class="o3-signal"><b>${sessions.length}</b> check-ins logged</div>
       </div>
@@ -102,7 +102,7 @@ function renderOneOnOnes(){
               <div class="o3-card-head">
                 <div>
                   <div class="o3-card-date">${window.fmtDate(e.date)}</div>
-                  <div class="o3-card-avg">check-in signal ${avg} / 5</div>
+                  <div class="o3-card-avg">🌟 growth reflection ${avg} / 5</div>
                 </div>
                 <div class="card-actions">
                   <button class="icon-btn" data-edit-o3="${e.id}" title="Edit">✎</button>
@@ -115,7 +115,7 @@ function renderOneOnOnes(){
                 <div><div class="o3-dim-label">Delivery confidence</div>${dimNote(e.deadlineHandling)}</div>
                 <div><div class="o3-dim-label">Additional contribution</div>${dimNote(e.extra)}${tags ? `<div class="invoice-flags" style="margin:8px 0 0;">${tags}</div>` : ''}</div>
               </div>
-              ${e.nextActions ? `<div class="invoice-notes"><b>Next:</b> ${window.escapeHTML(e.nextActions)}</div>` : ''}
+              ${e.nextActions ? `<div class="invoice-notes"><b>🎯 Agreed next step:</b> ${window.escapeHTML(e.nextActions)}</div>` : ''}
             </article>`;
         }).join('') : `<div class="empty">No check-ins for ${window.escapeHTML(m.name)} yet — capture a specific work example to start.</div>`}
       </div>

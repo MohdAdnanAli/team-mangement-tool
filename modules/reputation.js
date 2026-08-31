@@ -1,8 +1,8 @@
 const REP_KEYS = [
-  { key:'serious', label:'Reliability', hint:'Follow-through, clear ownership, and dependable delivery', icon:'◆' },
-  { key:'procrastinations', label:'Delivery risks', hint:'Blocked work, late starts, or commitments that need attention', icon:'◷' },
-  { key:'dealings', label:'Collaboration', hint:'Clear communication and dependable work with others', icon:'⇄' },
-  { key:'extra', label:'Contributions', hint:'Initiative, unblocking, mentoring, and quality improvements', icon:'★' },
+  { key:'serious', label:'Follow-through', hint:'Clear ownership and dependable delivery', icon:'🏅' },
+  { key:'procrastinations', label:'Support to unblock', hint:'Work that needs context, help, or a revised plan', icon:'🧭' },
+  { key:'dealings', label:'Teamwork', hint:'Clear communication and dependable work with others', icon:'🤝' },
+  { key:'extra', label:'Above & beyond', hint:'Initiative, mentoring, unblocking, and quality improvements', icon:'✨' },
 ];
 
 const O3_DIMS = [
@@ -89,7 +89,7 @@ function memberCounters(member){
 
 function rewardPoints(counters){
   const c = counters || emptyStats();
-  return Math.max(0,
+  return (
     c.serious * 10 +
     c.dealings * 8 +
     c.extra * 6 -
@@ -98,10 +98,10 @@ function rewardPoints(counters){
 }
 
 function rewardGrade(points){
-  if(points >= 90) return { label:'Strong momentum', cls:'success', band:'A' };
-  if(points >= 60) return { label:'Steady', cls:'teal', band:'B' };
-  if(points >= 30) return { label:'Building', cls:'amber', band:'C' };
-  return { label:'Needs support', cls:'danger', band:'D' };
+  if(points >= 90) return { label:'Strong momentum', cls:'success', band:'A', icon:'🏆' };
+  if(points >= 60) return { label:'Steady progress', cls:'teal', band:'B', icon:'⭐' };
+  if(points >= 30) return { label:'Building rhythm', cls:'amber', band:'C', icon:'🌱' };
+  return { label:'Support focus', cls:'danger', band:'D', icon:'🧭' };
 }
 
 function persistMemberStats(member){
@@ -241,7 +241,8 @@ function openOneOnOneModal(existing, memberId){
     </div>`;
 
   window.openModal(`
-    <div class="modal-title">${existing ? 'Edit check-in' : 'Log a check-in'}</div>
+    <div class="modal-title">${existing ? 'Edit growth check-in' : 'Start a growth check-in'}</div>
+    <div class="o3-welcome">✨ Recognise a specific win, name any support needed, and agree one next step.</div>
     <div class="row2">
       <div class="field"><label>Teammate</label><select id="o3Member">${memberOptions}</select></div>
       <div class="field"><label>Date</label><input id="o3Date" type="date" value="${data.date}"></div>
@@ -260,10 +261,10 @@ function openOneOnOneModal(existing, memberId){
       </div>
     </div>
     <div class="field"><label>Next actions</label><textarea id="o3Next" rows="2" placeholder="Agree one or two clear actions for the next check-in.">${window.escapeHTML(data.nextActions || '')}</textarea></div>
-    <div class="o3-apply">Scores summarise work signals over time. Keep notes specific and use manual adjustments only when context needs it.</div>
+    <div class="o3-apply">Scores are conversation prompts, not a ranking. Keep notes specific and use them to make support and recognition visible.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
-      <button class="btn btn-primary" id="saveO3Btn">${existing ? 'Save check-in' : 'Log check-in'}</button>
+      <button class="btn btn-primary" id="saveO3Btn">${existing ? 'Save check-in' : 'Save growth check-in'}</button>
     </div>
   `);
 
@@ -311,7 +312,7 @@ function openOneOnOneModal(existing, memberId){
     if(window.renderNav) window.renderNav();
     if(window.renderTicker) window.renderTicker();
     if(window.render) window.render();
-    window.toast(existing ? 'Check-in updated' : 'Check-in logged');
+    window.toast(existing ? 'Growth check-in updated' : 'Growth check-in saved');
   });
 }
 Object.assign(window,{REP_KEYS,O3_DIMS,EXTRA_TAGS,emptyStats,normalizeStats,memberSignals,memberCounters,rewardPoints,rewardGrade,persistMemberStats,bumpCounter,emptyOneOnOne,normalizeOneOnOne,oneOnOneAverage,flattenOneOnOne,saveOneOnOne,removeOneOnOne,openOneOnOneModal});

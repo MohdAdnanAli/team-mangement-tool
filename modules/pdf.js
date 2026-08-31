@@ -34,8 +34,10 @@ export async function buildExportPDF(selected){
   if(selected.includes('workload')) sections.pdfWorkload(ctx);
   if(selected.includes('projects')) sections.pdfProjects(ctx);
   if(selected.includes('team')) sections.pdfTeam(ctx);
+  if(selected.includes('checkins')) sections.pdfCheckins(ctx);
   if(selected.includes('bills')) sections.pdfBills(ctx);
   if(selected.includes('agreements')) sections.pdfAgreements(ctx);
+  sections.pdfDisclaimer(ctx);
 
   if(!ctx.page) ctx.header('Ops Console', 'No sections were selected for export.');
 

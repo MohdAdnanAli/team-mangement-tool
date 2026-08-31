@@ -816,6 +816,7 @@ const EXPORT_SECTIONS = [
   { key:'workload', title:'Workload', desc:'Active hours vs weekly capacity per teammate' },
   { key:'projects', title:'Projects', desc:'Project list with completion progress' },
   { key:'team', title:'Team', desc:'Members, roles and weekly capacity' },
+  { key:'checkins', title:'Check-ins', desc:'Growth conversations, strengths, support areas and agreed next actions' },
   { key:'bills', title:'Bills', desc:'Invoices with line items and totals' },
   { key:'agreements', title:'Agreements', desc:'Verbal deals & billing terms' },
 ];

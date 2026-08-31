@@ -25,6 +25,13 @@ function renderDashboard(){
         <div class="panel-title">Project health</div>
         <div id="dashHealth" class="health-grid"></div>
       </div>
+      <div class="panel full-span checkin-summary-panel">
+        <div class="panel-head-row">
+          <div><div class="panel-title">Growth check-ins</div><div class="panel-subtitle">Celebrate progress, record context, and agree the next small step.</div></div>
+          <button class="btn btn-sm btn-ghost" id="dashOpenCheckins">Open check-ins →</button>
+        </div>
+        <div id="dashCheckins"></div>
+      </div>
     </div>
   `;
 
@@ -32,6 +39,10 @@ function renderDashboard(){
   document.getElementById('dashQuickAddBtn').addEventListener('click', ()=>_safeOpen('openTaskModal','open-task-modal'));
   document.getElementById('dashOpenBoard').addEventListener('click', ()=>{
     window.state.view = 'kanban';
+    window.render();
+  });
+  document.getElementById('dashOpenCheckins').addEventListener('click', ()=>{
+    window.state.view = 'oneonones';
     window.render();
   });
 
@@ -46,6 +57,7 @@ function renderDashboard(){
 
   renderDeadlines();
   renderHealth();
+  renderCheckInSummary();
 
   function renderDeadlines(){
     const el = document.getElementById('dashDeadlines');
@@ -137,6 +149,40 @@ function renderDashboard(){
           </div>
         </div>`;
     }).join('');
+  }
+
+  function renderCheckInSummary(){
+    const el = document.getElementById('dashCheckins');
+    if(!el) return;
+    const entries = (window.state.oneOnOnes || []).map(window.normalizeOneOnOne)
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    const members = window.state.members || [];
+    if(!entries.length){
+      el.innerHTML = `<div class="checkin-empty"><span>🌱</span><div><b>Start with a short growth conversation.</b><br>Capture one specific win, one area of support, and a clear next step.</div></div>`;
+      return;
+    }
+    const latestByMember = new Map();
+    entries.forEach(entry=>{ if(!latestByMember.has(entry.memberId)) latestByMember.set(entry.memberId, entry); });
+    const average = (entries.reduce((sum,e)=>sum + window.oneOnOneAverage(e), 0) / entries.length).toFixed(1);
+    const withCheckin = latestByMember.size;
+    el.innerHTML = `
+      <div class="checkin-summary-stats">
+        <div><span class="checkin-stat-icon">🏆</span><b>${entries.length}</b><small>conversations logged</small></div>
+        <div><span class="checkin-stat-icon">⭐</span><b>${average}/5</b><small>average check-in signal</small></div>
+        <div><span class="checkin-stat-icon">🤝</span><b>${withCheckin}/${members.length}</b><small>teammates with context</small></div>
+      </div>
+      <div class="checkin-recent-list">
+        ${[...latestByMember.values()].slice(0,3).map(entry=>{
+          const person = window.member(entry.memberId);
+          const win = entry.extra.note || entry.behaviour.note || 'A check-in was recorded.';
+          return `<button class="checkin-recent" data-checkin-member="${entry.memberId}"><span>✨</span><div><b>${window.escapeHTML(person ? person.name : 'Teammate')}</b><small>${window.escapeHTML(win)}</small></div><em>${window.fmtDate(entry.date)}</em></button>`;
+        }).join('')}
+      </div>`;
+    el.querySelectorAll('[data-checkin-member]').forEach(button=>button.addEventListener('click',()=>{
+      window.state.o3Focus = button.dataset.checkinMember;
+      window.state.view = 'oneonones';
+      window.render();
+    }));
   }
 }
 window.renderDashboard = renderDashboard;
